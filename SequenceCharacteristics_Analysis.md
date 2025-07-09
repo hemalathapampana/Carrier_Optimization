@@ -8,7 +8,7 @@ This document provides detailed analysis of the four key sequence characteristic
 
 ## 1. Ordering
 
-### What, Who, How Analysis
+### What, Why, How Analysis
 
 #### What
 **What does Sequence Ordering do?**
@@ -18,14 +18,14 @@ This document provides detailed analysis of the four key sequence characteristic
 - Ensures most promising sequences are processed before less optimal alternatives
 - Provides systematic ranking of sequence effectiveness for resource allocation
 
-#### Who
-**Who uses Sequence Ordering?**
-- **Optimization queue processors** - Process sequences in priority order to maximize cost savings
-- **Rate plan assignment algorithms** - Use ordered sequences to find optimal assignments efficiently
-- **Performance optimization systems** - Prioritize processing of high-value sequences first
-- **Resource allocation managers** - Distribute computational resources based on sequence priority
-- **Business stakeholders** - Benefit from prioritized processing of most cost-effective sequences
-- **Financial analysts** - Monitor sequence ordering effectiveness and cost optimization results
+#### Why
+**Why is Sequence Ordering needed?**
+- **Maximizes cost savings potential** by processing most promising sequences first before system resources are exhausted
+- **Improves optimization efficiency** by focusing computational resources on sequences with highest return on investment
+- **Enables early termination** when resource limits are reached while ensuring best sequences have been processed
+- **Provides predictable results** by establishing consistent ranking criteria across different optimization scenarios
+- **Reduces processing time** by identifying optimal solutions faster through priority-based processing
+- **Supports business objectives** by ensuring cost-effective sequences receive processing priority over less valuable alternatives
 
 #### How
 **How does Sequence Ordering work?**
@@ -104,7 +104,7 @@ OUTPUT:
 
 ## 2. Filtering
 
-### What, Who, How Analysis
+### What, Why, How Analysis
 
 #### What
 **What does Sequence Filtering do?**
@@ -114,14 +114,14 @@ OUTPUT:
 - Excludes sequences that exceed resource or capacity limits
 - Ensures only viable and compliant sequences proceed to optimization
 
-#### Who
-**Who uses Sequence Filtering?**
-- **Business rule engines** - Apply filtering rules to ensure compliance with optimization policies
-- **Constraint validation systems** - Remove sequences that violate technical or business constraints
-- **Quality assurance processes** - Filter sequences to maintain optimization quality standards
-- **Compatibility checkers** - Ensure sequence compatibility with device and service requirements
-- **Resource managers** - Filter sequences based on available resources and capacity limits
-- **Compliance officers** - Ensure filtered sequences meet regulatory and policy requirements
+#### Why
+**Why is Sequence Filtering needed?**
+- **Prevents invalid optimization results** by eliminating sequences that would produce non-compliant or impossible assignments
+- **Reduces computational waste** by filtering out sequences that cannot produce viable solutions before expensive processing
+- **Ensures business compliance** by removing sequences that violate regulatory requirements or company policies
+- **Maintains system stability** by preventing resource exhaustion from processing invalid or oversized sequence collections
+- **Improves solution quality** by ensuring only technically feasible and business-appropriate sequences reach optimization
+- **Protects against errors** by validating sequence compatibility before committing to optimization processing
 
 #### How
 **How does Sequence Filtering work?**
@@ -202,7 +202,7 @@ if (deviceResults.Any(x => x.RatePlanTypeId == null || x.OptimizationGroupId == 
 
 ## 3. Limits
 
-### What, Who, How Analysis
+### What, Why, How Analysis
 
 #### What
 **What do Sequence Limits do?**
@@ -212,14 +212,14 @@ if (deviceResults.Any(x => x.RatePlanTypeId == null || x.OptimizationGroupId == 
 - Ensures optimization remains within computational and memory constraints
 - Provides scalable processing by managing sequence volume
 
-#### Who
-**Who uses Sequence Limits?**
-- **Lambda execution managers** - Ensure optimization functions stay within memory and timeout limits
-- **Performance optimization teams** - Manage system resources and prevent resource exhaustion
-- **Capacity planning engineers** - Set appropriate limits based on system capabilities and requirements
-- **Operations teams** - Monitor limit effectiveness and adjust based on system performance
-- **Business administrators** - Configure limits based on optimization priorities and resource availability
-- **System architects** - Design limits to balance optimization quality with system performance
+#### Why
+**Why are Sequence Limits needed?**
+- **Prevents system overload** by controlling sequence volume to stay within Lambda memory and execution time constraints
+- **Enables scalable processing** by automatically triggering distributed processing when sequence counts exceed manageable limits
+- **Protects against combinatorial explosion** where rate plan combinations could generate millions of sequences overwhelming system resources
+- **Ensures predictable performance** by maintaining consistent execution times regardless of input complexity
+- **Optimizes resource utilization** by balancing processing thoroughness with system capacity constraints
+- **Provides graceful degradation** by switching to bulk processing mode when limits are exceeded rather than failing
 
 #### How
 **How do Sequence Limits work?**
@@ -302,7 +302,7 @@ if (ratePoolSequences.Count > OptimizationConstant.RATE_PLAN_SEQUENCES_FIRST_INS
 
 ## 4. Batching
 
-### What, Who, How Analysis
+### What, Why, How Analysis
 
 #### What
 **What does Sequence Batching do?**
@@ -312,14 +312,14 @@ if (ratePoolSequences.Count > OptimizationConstant.RATE_PLAN_SEQUENCES_FIRST_INS
 - Prevents memory overflow and timeout issues during sequence processing
 - Facilitates distributed processing and improved system scalability
 
-#### Who
-**Who uses Sequence Batching?**
-- **Distributed processing systems** - Process sequence batches in parallel across multiple instances
-- **Message queue managers** - Send sequence batches as individual SQS messages for processing
-- **Memory management systems** - Keep processing within memory limits by controlling batch sizes
-- **Performance optimization teams** - Optimize batch sizes for maximum throughput and efficiency
-- **Lambda execution managers** - Ensure processing stays within execution time and memory limits
-- **Scalability engineers** - Design batch processing for horizontal scaling capabilities
+#### Why
+**Why is Sequence Batching needed?**
+- **Enables horizontal scaling** by distributing large sequence collections across multiple Lambda instances for parallel processing
+- **Prevents memory limitations** by breaking large collections into manageable chunks that fit within Lambda memory constraints
+- **Avoids timeout issues** by ensuring each batch can be processed within Lambda execution time limits
+- **Improves throughput** by allowing simultaneous processing of multiple batches rather than sequential processing
+- **Provides fault tolerance** by isolating failures to individual batches rather than entire sequence collections
+- **Optimizes SQS usage** by keeping message sizes within limits while maximizing processing efficiency
 
 #### How
 **How does Sequence Batching work?**
