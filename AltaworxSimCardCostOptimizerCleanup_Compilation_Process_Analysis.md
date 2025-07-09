@@ -494,3 +494,373 @@ The AltaworxSimCardCostOptimizerCleanup compilation process is a sophisticated s
 5. **Distributes results** through multiple channels (email, database, queues)
 
 The system handles multiple portal types (M2M, Mobility, CrossProvider) and optimization scenarios (single customer, cross-customer, carrier-level) while maintaining data integrity and providing robust error handling and retry mechanisms.
+
+## Algorithmic Breakdown: What, Why, and How
+
+### 1. Winner Selection for Communication Groups
+
+#### WHAT:
+Identifies the optimal optimization queue for each communication group based on lowest total cost.
+
+#### WHY:
+- Multiple optimization algorithms run simultaneously for the same devices
+- Need to select the best performing optimization result
+- Ensures cost-effective rate plan assignments for customers
+
+#### HOW - Algorithm:
+```
+Algorithm: SelectWinningQueue
+Input: communicationGroupId
+Output: winningQueueId
+
+1. FOR each communicationGroup in optimizationInstance:
+   a. Query all completed optimization queues for the group
+   b. Filter queues with valid TotalCost and RunEndTime
+   c. Sort by TotalCost in ascending order
+   d. SELECT TOP 1 queue with lowest cost
+   e. Return queueId as winner
+
+2. Store winningQueueIds for result compilation
+```
+
+#### Code Location:
+```csharp
+// Lines 336-352: CleanupInstance method - Communication group processing
+foreach (var commGroup in commGroups)
+{
+    var winningQueueId = GetWinningQueueId(context, commGroup.Id);
+    // ... process winning queue
+    queueIds.Add(winningQueueId);
+}
+
+// Lines 2070-2093: Winner selection algorithm
+protected long GetWinningQueueId(KeySysLambdaContext context, long commGroupId)
+{
+    using (var cmd = new SqlCommand("SELECT TOP 1 Id FROM OptimizationQueue " +
+        "WHERE CommPlanGroupId = @commGroupId AND TotalCost IS NOT NULL " +
+        "AND RunEndTime IS NOT NULL ORDER BY TotalCost ASC", conn))
+    {
+        // Returns queue with lowest total cost
+    }
+}
+```
+
+### 2. Cost Savings and Optimization Statistics Compilation
+
+#### WHAT:
+Calculates comprehensive optimization metrics including cost savings, device distributions, and usage patterns.
+
+#### WHY:
+- Provides business value quantification of optimization efforts
+- Enables tracking of optimization effectiveness over time
+- Supports decision-making for future optimization strategies
+
+#### HOW - Algorithm:
+```
+Algorithm: CompileOptimizationStatistics
+Input: winningQueueIds, billingPeriod, portalType
+Output: optimizationStatistics
+
+1. Initialize result containers:
+   a. Create M2MOptimizationResult OR MobilityOptimizationResult
+   b. Create crossCustomerResult for shared pool analysis
+
+2. FOR each portalType (M2M, Mobility, CrossProvider):
+   a. Get rate plans for the billing period
+   b. Create rate pool mappings from optimization results
+   c. Generate customer-specific and cross-customer rate pools
+
+3. FOR each winningQueueId:
+   a. Retrieve device optimization results from database
+   b. Calculate original costs (before optimization)
+   c. Calculate optimized costs (after optimization)
+   d. Assign devices to appropriate rate pools
+   e. Aggregate cost savings per rate pool
+
+4. Generate statistics:
+   a. Total cost savings = originalCost - optimizedCost
+   b. Device distribution per rate plan
+   c. Usage patterns and overage analysis
+   d. Optimization success percentage
+
+5. Create shared pool analysis (if applicable):
+   a. Include cross-customer optimization opportunities
+   b. Calculate additional savings from shared pools
+
+6. Serialize statistics to byte arrays for Excel generation
+```
+
+#### Code Location:
+```csharp
+// Lines 747-804: M2M statistics compilation
+protected OptimizationInstanceResultFile WriteM2MResults(KeySysLambdaContext context, 
+    OptimizationInstance instance, List<long> queueIds, BillingPeriod billingPeriod, 
+    bool usesProration, bool isCustomerOptimization)
+{
+    // Get rate pools for compilation
+    var crossOptimizationResultRatePools = GetResultRatePools(context, instance, 
+        billingPeriod, usesProration, queueIds, isCustomerOptimization);
+    
+    foreach (var queueId in queueIds)
+    {
+        var deviceResults = GetM2MResults(context, new List<long>() { queueId }, billingPeriod);
+        result = BuildM2MOptimizationResult(deviceResults, optimizationResultRatePools, result);
+    }
+}
+
+// Lines 622, 780, 2307: Statistics generation
+var statFileBytes = RatePoolStatisticsWriter.WriteRatePoolStatistics(
+    SimCardGrouping.GroupByCommunicationPlan, result);
+```
+
+### 3. Excel Report Generation with Device Assignments
+
+#### WHAT:
+Creates comprehensive Excel workbooks containing optimization statistics, device assignments, and cost analysis.
+
+#### WHY:
+- Provides user-friendly visualization of optimization results
+- Enables detailed analysis of device-to-rate-plan assignments
+- Supports business reporting and audit requirements
+
+#### HOW - Algorithm:
+```
+Algorithm: GenerateExcelReports
+Input: optimizationStatistics, deviceAssignments, sharedPoolData
+Output: excelWorkbookBytes
+
+1. Prepare data components:
+   a. Statistics bytes = RatePoolStatisticsWriter.WriteRatePoolStatistics()
+   b. Assignment bytes = RatePoolAssignmentWriter.WriteRatePoolAssignments()
+   c. SharedPool statistics (if cross-customer optimization exists)
+   d. SharedPool assignments (if cross-customer optimization exists)
+
+2. Create Excel workbook structure:
+   Sheet 1: "Summary Statistics"
+   - Total cost savings
+   - Device count by rate plan
+   - Optimization success metrics
+   
+   Sheet 2: "Device Assignments"
+   - ICCID to Rate Plan mappings
+   - Original vs. Optimized rate plans
+   - Cost savings per device
+   
+   Sheet 3: "Shared Pool Analysis" (conditional)
+   - Cross-customer optimization opportunities
+   - Additional savings potential
+
+3. Populate Excel sheets:
+   a. Convert byte arrays to structured data
+   b. Apply formatting and styling
+   c. Add charts and visualizations
+   d. Include metadata (billing period, execution time)
+
+4. Generate final Excel file:
+   a. Combine all sheets into single workbook
+   b. Compress and optimize file size
+   c. Return as byte array for storage/transmission
+```
+
+#### Code Location:
+```csharp
+// Lines 632, 790, 2317: Excel generation across portal types
+var assignmentXlsxBytes = RatePoolAssignmentWriter.GenerateExcelFileFromByteArrays(
+    statFileBytes, assignmentFileBytes, sharedPoolStatFileBytes, sharedPoolAssignmentFileBytes);
+
+// Lines 647-717: Mobility carrier-specific Excel generation
+var assignmentXlsxBytes = RatePoolAssignmentWriter.WriteOptimizationResultSheet(
+    deviceAssignments, summariesByRatePlans);
+
+// Lines 592-646: Standard mobility Excel generation
+var assignmentXlsxBytes = RatePoolAssignmentWriter.GenerateExcelFileFromByteArrays(
+    statFileBytes, assignmentFileBytes, sharedPoolStatFileBytes, sharedPoolAssignmentFileBytes);
+```
+
+### 4. Non-Winning Optimization Results Cleanup
+
+#### WHAT:
+Removes optimization results from non-winning queues to maintain database performance and storage efficiency.
+
+#### WHY:
+- Prevents database bloat from multiple optimization attempts
+- Maintains only the best optimization results for each communication group
+- Improves query performance for future operations
+
+#### HOW - Algorithm:
+```
+Algorithm: CleanupNonWinningResults
+Input: communicationGroupId, winningQueueId
+Output: cleanupStatus
+
+1. FOR each communicationGroup:
+   a. Get winningQueueId from winner selection algorithm
+   b. Identify all other queues for the same communication group
+   c. Mark non-winning queues for cleanup
+
+2. Execute cleanup operations:
+   a. Call stored procedure: usp_Optimization_DeviceResultAndQueueRatePlan_Cleanup
+   b. Parameters: @commGroupId, @winningQueueId
+   c. Timeout: 900 seconds (15 minutes) for large datasets
+
+3. Cleanup operations performed by stored procedure:
+   a. DELETE device results WHERE queueId != winningQueueId
+   b. DELETE rate plan mappings WHERE queueId != winningQueueId
+   c. UPDATE queue status to 'CompleteWithErrors' for non-winners
+   d. PRESERVE only winning queue results
+
+4. End non-winning queues:
+   a. UPDATE OptimizationQueue SET RunEndTime = GETUTCDATE()
+   b. SET RunStatusId = CompleteWithErrors
+   c. SET TotalCost = NULL (invalidate non-winning costs)
+
+5. Verify cleanup completion:
+   a. Check for any remaining non-winning results
+   b. Log cleanup statistics
+   c. Handle any cleanup errors or timeouts
+```
+
+#### Code Location:
+```csharp
+// Lines 341-347: Cleanup orchestration in CleanupInstance
+foreach (var commGroup in commGroups)
+{
+    var winningQueueId = GetWinningQueueId(context, commGroup.Id);
+    EndQueuesForCommGroup(context, commGroup.Id);
+    CleanupDeviceResultsForCommGroup(context, commGroup.Id, winningQueueId);
+    queueIds.Add(winningQueueId);
+}
+
+// Lines 2094-2113: End non-winning queues
+private void EndQueuesForCommGroup(KeySysLambdaContext context, long commGroupId)
+{
+    using (var cmd = new SqlCommand("UPDATE OptimizationQueue WITH (HOLDLOCK) " +
+        "SET RunEndTime = GETUTCDATE(), RunStatusId = @runStatusId, TotalCost = NULL " +
+        "WHERE CommPlanGroupId = @commGroupId AND RunEndTime IS NULL", conn))
+    {
+        cmd.Parameters.AddWithValue("@runStatusId", (int)OptimizationStatus.CompleteWithErrors);
+        cmd.ExecuteNonQuery();
+    }
+}
+
+// Lines 2114-2135: Cleanup device results
+private void CleanupDeviceResultsForCommGroup(KeySysLambdaContext context, 
+    long commGroupId, long queueId)
+{
+    using (var cmd = new SqlCommand("usp_Optimization_DeviceResultAndQueueRatePlan_Cleanup", conn))
+    {
+        cmd.CommandType = CommandType.StoredProcedure;
+        cmd.Parameters.AddWithValue("@commGroupId", commGroupId);
+        cmd.Parameters.AddWithValue("@winningQueueId", queueId);
+        cmd.CommandTimeout = 900; // 15-minute timeout
+        cmd.ExecuteNonQuery();
+    }
+}
+```
+
+## Complete Compilation Process Algorithm
+
+```
+Algorithm: OptimizationCompilationProcess
+Input: instanceId, isCustomerOptimization, isLastInstance, serviceProviderId
+Output: compiledOptimizationResults
+
+1. VALIDATE and PREPARE:
+   a. Get optimization instance by instanceId
+   b. Check if instance status allows processing
+   c. Get billing period and communication groups
+   d. Initialize result containers
+
+2. PROCESS COMMUNICATION GROUPS:
+   FOR each communicationGroup in instance:
+       a. Execute SelectWinningQueue algorithm
+       b. Store winningQueueId for compilation
+       c. Execute CleanupNonWinningResults algorithm
+
+3. COMPILE OPTIMIZATION RESULTS:
+   a. Determine portal type (M2M, Mobility, CrossProvider)
+   b. Execute CompileOptimizationStatistics algorithm
+   c. Build rate pool collections
+   d. Calculate cost savings and device distributions
+
+4. GENERATE REPORTS:
+   a. Execute GenerateExcelReports algorithm
+   b. Create statistics and assignment byte arrays
+   c. Combine into final Excel workbook
+
+5. FINALIZE PROCESSING:
+   a. Save result file to database
+   b. Update instance status to CompleteWithSuccess
+   c. Distribute results via email/queues
+   d. Queue rate plan updates (if applicable)
+
+6. ERROR HANDLING:
+   IF any step fails:
+       a. Log error details
+       b. Execute RequeueCleanup algorithm
+       c. Apply exponential backoff delay
+       d. Retry up to maximum attempts
+```
+
+## Portal-Specific Algorithm Variations
+
+### M2M Portal Algorithm:
+```
+1. Get M2M rate plans for billing period
+2. Create customer-specific and cross-customer rate pools
+3. Process winning queue results
+4. Build M2M optimization result objects
+5. Generate shared pool analysis for cross-customer opportunities
+6. Create Excel with M2M-specific formatting
+```
+
+### Mobility Portal Algorithm:
+```
+1. Check optimization type (customer vs. carrier)
+2. IF customer optimization:
+   - Get bill-in-advance queue
+   - Process similar to M2M with mobility-specific logic
+3. IF carrier optimization:
+   - Get optimization groups and rate plans
+   - Group devices by optimization groups
+   - Calculate original vs. optimized assignments
+   - Generate carrier-specific Excel report
+```
+
+### CrossProvider Portal Algorithm:
+```
+1. Get cross-provider billing period
+2. Retrieve rate pools from multiple service providers
+3. Process results from multiple winning queues
+4. Handle shared pool results across providers
+5. Update cross-provider customer processing status
+6. Queue final email cleanup if last instance
+```
+
+## Key Data Structures and Flow
+
+### Rate Pool Structure:
+```
+ResultRatePool {
+    RatePlan ratePlan
+    Dictionary<string, SimCard> simCards
+    decimal totalCost
+    decimal totalSavings
+    int deviceCount
+    bool isSharedPool
+}
+```
+
+### Optimization Result Structure:
+```
+OptimizationResult {
+    RatePoolCollection combinedRatePools
+    decimal totalOriginalCost
+    decimal totalOptimizedCost
+    decimal totalSavings
+    int totalDeviceCount
+    long queueId
+}
+```
+
+This algorithmic breakdown provides a clear understanding of each compilation process step with specific code locations and implementation details.
