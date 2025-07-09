@@ -864,3 +864,562 @@ OptimizationResult {
 ```
 
 This algorithmic breakdown provides a clear understanding of each compilation process step with specific code locations and implementation details.
+
+## M2M and Mobility Report Generation: Algorithmic Breakdown
+
+### M2M Reports
+
+#### 1. Device Assignment Spreadsheets
+
+##### WHAT:
+Generates detailed Excel spreadsheets containing device-to-rate-plan assignments with ICCID mappings, usage data, and cost information.
+
+##### WHY:
+- Provides detailed visibility into which devices are assigned to which rate plans
+- Enables tracking of individual device optimization decisions
+- Supports audit and compliance requirements for M2M deployments
+- Allows customers to understand per-device cost savings
+
+##### HOW - Algorithm:
+```
+Algorithm: GenerateM2MDeviceAssignmentSpreadsheet
+Input: winningQueueIds, billingPeriod, optimizationInstance
+Output: deviceAssignmentExcelBytes
+
+1. RETRIEVE M2M DEVICE RESULTS:
+   a. FOR each winningQueueId:
+      - Query OptimizationDeviceResult table
+      - JOIN with Device, JasperCommunicationPlan, RatePlan tables
+      - Extract: DeviceId, ICCID, MSISDN, UsageMB, RatePlanCode, ChargeAmt
+      - Calculate billing period activation status
+
+2. BUILD RATE POOL COLLECTIONS:
+   a. Get customer-specific rate pools
+   b. Create cross-customer rate pools for shared optimization
+   c. Add unassigned rate pool for devices that couldn't be optimized
+
+3. ASSIGN DEVICES TO RATE POOLS:
+   a. FOR each deviceResult:
+      - Find matching rate pool by RatePlanId
+      - Add device to appropriate rate pool
+      - Calculate cost savings (original vs optimized)
+
+4. GENERATE ASSIGNMENT DATA:
+   a. Create assignment text file with device mappings
+   b. Include: ICCID, Original Rate Plan, New Rate Plan, Cost Savings
+   c. Format for Excel consumption
+
+5. CREATE EXCEL WORKBOOK:
+   a. Convert assignment data to Excel format
+   b. Add formatting and headers
+   c. Include multiple sheets if shared pools exist
+```
+
+##### Code Location:
+```csharp
+// Lines 747-804: Main M2M results compilation
+protected OptimizationInstanceResultFile WriteM2MResults(KeySysLambdaContext context, 
+    OptimizationInstance instance, List<long> queueIds, BillingPeriod billingPeriod, 
+    bool usesProration, bool isCustomerOptimization)
+
+// Lines 834-898: Device results retrieval
+private List<SimCardResult> GetM2MResults(KeySysLambdaContext context, 
+    List<long> queueIds, BillingPeriod billingPeriod)
+{
+    using (var cmd = new SqlCommand(@"
+        SELECT device.[Id] AS DeviceId, [UsageMB], device.[ICCID], device.[MSISDN],
+               ISNULL(commPlan.[AliasName], device.[CommunicationPlan]) AS CommunicationPlan, 
+               ISNULL(carrierPlan.[RatePlanCode], customerPlan.[RatePlanCode]) AS RatePlanCode, 
+               ISNULL(deviceResult.[AssignedCustomerRatePlanId], deviceResult.[AssignedCarrierRatePlanId]) AS RatePlanId
+        FROM OptimizationDeviceResult deviceResult 
+        INNER JOIN Device device ON deviceResult.[AmopDeviceId] = device.[Id]", conn))
+}
+
+// Lines 782-785: Assignment file generation
+var assignmentFileBytes = RatePoolAssignmentWriter.WriteRatePoolAssignments(result);
+var assignmentXlsxBytes = RatePoolAssignmentWriter.GenerateExcelFileFromByteArrays(
+    statFileBytes, assignmentFileBytes, sharedPoolStatFileBytes, sharedPoolAssignmentFileBytes);
+```
+
+#### 2. Cost Savings Summaries
+
+##### WHAT:
+Compiles comprehensive cost savings analysis showing before/after optimization costs, savings percentages, and financial impact.
+
+##### WHY:
+- Quantifies the business value of optimization efforts
+- Provides ROI justification for optimization investments
+- Enables tracking of optimization performance over time
+- Supports financial reporting and budgeting decisions
+
+##### HOW - Algorithm:
+```
+Algorithm: GenerateM2MCostSavingsSummary
+Input: optimizationResults, billingPeriod
+Output: costSavingsStatistics
+
+1. CALCULATE ORIGINAL COSTS:
+   a. FOR each device in optimization results:
+      - Get original rate plan assignment
+      - Calculate base rate + usage overage charges
+      - Include SMS charges if applicable
+      - Sum total original cost per device
+
+2. CALCULATE OPTIMIZED COSTS:
+   a. FOR each device in optimization results:
+      - Get optimized rate plan assignment
+      - Calculate new base rate + usage overage charges
+      - Include SMS charges with new rate plan
+      - Sum total optimized cost per device
+
+3. COMPUTE SAVINGS METRICS:
+   a. Total savings = sum(originalCost - optimizedCost)
+   b. Savings percentage = (totalSavings / totalOriginalCost) * 100
+   c. Average savings per device = totalSavings / deviceCount
+   d. Cost reduction by rate plan category
+
+4. GENERATE SUMMARY STATISTICS:
+   a. Group savings by rate pool
+   b. Calculate utilization improvements
+   c. Identify optimization success rates
+   d. Create cost distribution analysis
+
+5. FORMAT FOR REPORTING:
+   a. Create statistics byte array
+   b. Include charts and visualizations
+   c. Add executive summary metrics
+```
+
+##### Code Location:
+```csharp
+// Lines 777-780: Cost savings statistics generation
+var statFileBytes = RatePoolStatisticsWriter.WriteRatePoolStatistics(
+    SimCardGrouping.GroupByCommunicationPlan, result);
+
+// Lines 1377-1390: M2M optimization result building
+private M2MOptimizationResult BuildM2MOptimizationResult(List<SimCardResult> deviceResults, 
+    List<ResultRatePool> ratePools, M2MOptimizationResult result, bool shouldSkipAutoChangeRatePlan = false)
+{
+    result.QueueId = deviceResults.FirstOrDefault()?.QueueId ?? 0;
+    AddSimCardsToResultRatePools(deviceResults, ratePools, shouldSkipAutoChangeRatePlan);
+    result.CombinedRatePools = new RatePoolCollection(ratePools);
+    return result;
+}
+
+// Lines 1073-1128: SimCard result parsing with cost data
+private SimCardResult SimCardResultFromReader(SqlDataReader rdr, BillingPeriod billingPeriod)
+{
+    // Extracts: ChargeAmt, BaseRateAmount, RateChargeAmount, OverageChargeAmount
+    // Calculates billing period activation and cost allocation
+}
+```
+
+#### 3. Rate Plan Utilization Statistics
+
+##### WHAT:
+Analyzes how devices are distributed across rate plans and identifies utilization patterns and optimization opportunities.
+
+##### WHY:
+- Identifies underutilized or overutilized rate plans
+- Supports rate plan portfolio optimization decisions
+- Enables capacity planning for future device deployments
+- Helps identify opportunities for shared pool optimization
+
+##### HOW - Algorithm:
+```
+Algorithm: GenerateM2MRatePlanUtilizationStatistics
+Input: optimizationResults, ratePlans, billingPeriod
+Output: utilizationStatistics
+
+1. ANALYZE DEVICE DISTRIBUTION:
+   a. GROUP devices by rate plan
+   b. COUNT devices per rate plan
+   c. CALCULATE utilization percentage per rate plan
+   d. IDENTIFY over/under-utilized plans
+
+2. CALCULATE USAGE PATTERNS:
+   a. FOR each rate plan:
+      - Average data usage per device
+      - Peak usage periods
+      - Overage frequency and amounts
+      - Device activation patterns
+
+3. ASSESS OPTIMIZATION EFFECTIVENESS:
+   a. Before/after rate plan assignments
+   b. Device migration patterns
+   c. Consolidation opportunities identified
+   d. Shared pool utilization rates
+
+4. GENERATE UTILIZATION METRICS:
+   a. Rate plan efficiency scores
+   b. Capacity utilization percentages
+   c. Cost per MB by rate plan
+   d. Optimization success rates by plan
+
+5. CREATE REPORTING DATA:
+   a. Utilization charts and graphs
+   b. Trend analysis over time
+   c. Recommendations for plan adjustments
+```
+
+##### Code Location:
+```csharp
+// Lines 1150-1174: Rate pool creation and utilization tracking
+private List<ResultRatePool> GetResultRatePools(KeySysLambdaContext context, 
+    OptimizationInstance instance, BillingPeriod billingPeriod, bool usesProration, 
+    List<long> queueIds, bool isCustomerOptimization)
+
+// Lines 1201-1221: Rate pool generation from rate plans
+private static List<ResultRatePool> GenerateResultRatePoolFromRatePlans(
+    BillingPeriod billingPeriod, bool usesProration, List<RatePlan> ratePlans, 
+    List<RatePlanPoolMapping> planPoolMappings, bool isSharedRatePool, OptimizationInstance instance)
+
+// Lines 1391-1433: Device assignment to rate pools
+private static void AddSimCardsToResultRatePools(List<SimCardResult> deviceResults, 
+    List<ResultRatePool> ratePools, bool shouldSkipAutoChangeRatePlan = false)
+{
+    foreach (var deviceResult in deviceResults)
+    {
+        var targetRatePool = ratePools.FirstOrDefault(r => r.RatePlan.Id == deviceResult.RatePlanId);
+        if (targetRatePool != null && (!shouldSkipAutoChangeRatePlan || !targetRatePool.RatePlan.AutoChangeRatePlan))
+        {
+            targetRatePool.AddSimCard(deviceResult);
+        }
+    }
+}
+```
+
+#### 4. Optimization Group Details
+
+##### WHAT:
+Provides detailed analysis of optimization groups, showing how devices are organized and optimized within logical groupings.
+
+##### WHY:
+- Enables understanding of optimization logic and grouping strategies
+- Supports troubleshooting of optimization decisions
+- Provides transparency into the optimization algorithm behavior
+- Helps identify optimization group effectiveness
+
+##### HOW - Algorithm:
+```
+Algorithm: GenerateM2MOptimizationGroupDetails
+Input: optimizationResults, communicationGroups
+Output: optimizationGroupDetails
+
+1. ORGANIZE BY COMMUNICATION GROUPS:
+   a. GROUP devices by communication plan
+   b. IDENTIFY optimization groups within each comm plan
+   c. MAP devices to their assigned optimization groups
+
+2. ANALYZE GROUP PERFORMANCE:
+   a. FOR each optimization group:
+      - Count devices in group
+      - Calculate group cost savings
+      - Identify rate plan assignments within group
+      - Assess group optimization success rate
+
+3. GENERATE GROUP METRICS:
+   a. Group size distribution
+   b. Cost savings by group
+   c. Rate plan diversity within groups
+   d. Cross-group optimization opportunities
+
+4. CREATE DETAILED REPORTING:
+   a. Group assignment tables
+   b. Performance metrics by group
+   c. Optimization decision explanations
+   d. Group efficiency analysis
+```
+
+##### Code Location:
+```csharp
+// Lines 805-820: Unassigned rate pool management
+private static void AddUnassignedRatePool(KeySysLambdaContext context, 
+    OptimizationInstance instance, BillingPeriod billingPeriod, bool usesProration, 
+    List<ResultRatePool> crossOptimizationResultRatePools, 
+    List<ResultRatePool> optimizationResultRatePools = null)
+
+// Lines 821-833: Customer-specific rate pool generation
+private static List<ResultRatePool> GenerateCustomerSpecificRatePools(
+    List<ResultRatePool> crossOptimizationResultRatePools)
+
+// Lines 940-1004: Shared pool results for cross-group optimization
+private List<SimCardResult> GetM2MSharedPoolResults(KeySysLambdaContext context, 
+    List<long> queueIds, BillingPeriod billingPeriod)
+```
+
+### Mobility Reports
+
+#### 1. Optimization Group Summaries
+
+##### WHAT:
+Generates summary reports for mobility optimization groups showing carrier-level optimization results and group performance metrics.
+
+##### WHY:
+- Provides carrier-specific optimization insights
+- Enables comparison between different optimization groups
+- Supports carrier relationship management decisions
+- Identifies optimization opportunities at the group level
+
+##### HOW - Algorithm:
+```
+Algorithm: GenerateMobilityOptimizationGroupSummaries
+Input: optimizationInstance, queueIds, billingPeriod
+Output: optimizationGroupSummaries
+
+1. RETRIEVE CARRIER DATA:
+   a. Get valid rate plans from carrier repository
+   b. Get optimization groups with rate plan mappings
+   c. Filter by service provider and billing period
+
+2. PROCESS DEVICE RESULTS:
+   a. Get mobility device results for winning queues
+   b. Group devices by OptimizationGroupId
+   c. Validate rate plan and group assignments
+
+3. GENERATE GROUP SUMMARIES:
+   a. FOR each optimization group:
+      - Calculate total devices in group
+      - Compute cost savings for group
+      - Analyze rate plan distribution
+      - Generate group performance metrics
+
+4. CREATE SUMMARY MODELS:
+   a. Map result pools to summary models
+   b. Include optimization group metadata
+   c. Calculate group-level statistics
+   d. Format for Excel reporting
+```
+
+##### Code Location:
+```csharp
+// Lines 647-717: Mobility carrier results processing
+protected OptimizationInstanceResultFile WriteMobilityCarrierResults(KeySysLambdaContext context, 
+    OptimizationInstance instance, List<long> queueIds, BillingPeriod billingPeriod, bool usesProration)
+{
+    var ratePlans = carrierRatePlanRepository.GetValidRatePlans(ParameterizedLog(context), 
+        instance.ServiceProviderId.GetValueOrDefault());
+    var optimizationGroups = carrierRatePlanRepository.GetValidOptimizationGroupsWithRatePlanIds(
+        ParameterizedLog(context), instance.ServiceProviderId.GetValueOrDefault());
+}
+
+// Lines 718-727: Summary generation from result pools
+private List<MobilityCarrierSummaryReportModel> MapToSummariesFromResult(
+    List<ResultRatePool> optimizationGroupResultPools, OptimizationGroup optimizationGroup)
+{
+    var summaries = new List<MobilityCarrierSummaryReportModel>();
+    foreach (var resultPool in optimizationGroupResultPools)
+    {
+        summaries.Add(MobilityCarrierSummaryReportModel.FromResultPool(resultPool, optimizationGroup));
+    }
+    return summaries;
+}
+```
+
+#### 2. Device Assignment by Group
+
+##### WHAT:
+Creates detailed device assignment reports organized by optimization groups, showing how devices are assigned to rate plans within each group.
+
+##### WHY:
+- Provides granular visibility into group-level optimization decisions
+- Enables validation of optimization group logic
+- Supports troubleshooting of device assignment issues
+- Facilitates optimization group performance analysis
+
+##### HOW - Algorithm:
+```
+Algorithm: GenerateMobilityDeviceAssignmentsByGroup
+Input: optimizationGroups, deviceResults, billingPeriod
+Output: deviceAssignmentsByGroup
+
+1. ORGANIZE DEVICES BY GROUPS:
+   a. Group device results by OptimizationGroupId
+   b. Map rate plans to each optimization group
+   c. Create result rate pools for each group
+
+2. CALCULATE ORIGINAL ASSIGNMENTS:
+   a. Create original rate pool collection
+   b. Assign devices to original rate pools
+   c. Calculate original costs per device
+
+3. PROCESS OPTIMIZED ASSIGNMENTS:
+   a. FOR each optimization group:
+      - Assign devices to optimized rate pools
+      - Calculate optimized costs per device
+      - Determine cost savings per device
+
+4. GENERATE ASSIGNMENT MODELS:
+   a. Create device assignment export models
+   b. Include original and optimized rate plans
+   c. Add cost savings and optimization group info
+   d. Format for Excel consumption
+
+5. COMBINE GROUP ASSIGNMENTS:
+   a. Aggregate assignments across all groups
+   b. Maintain group-level organization
+   c. Include group metadata and performance metrics
+```
+
+##### Code Location:
+```csharp
+// Lines 661-698: Device assignment processing by optimization group
+var deviceResultsByOptimizationGroups = deviceResults
+    .Where(x => x.RatePlanTypeId != null && x.OptimizationGroupId != null)
+    .GroupBy(x => x.OptimizationGroupId)
+    .ToDictionary(x => x.Key, x => x.ToList());
+
+foreach (var optimizationGroup in optimizationGroups)
+{
+    // Process each group's device assignments
+    var groupRatePlans = MapRatePlansToOptimizationGroup(ratePlans, optimizationGroup);
+    // Create result pools and assign devices
+}
+
+// Lines 728-746: Device assignment mapping
+private List<MobilityCarrierAssignmentExportModel> MapToMobilityDeviceAssignmentsFromResult(
+    RatePoolCollection originalAssignmentCollection, List<ResultRatePool> optimizationGroupResultPools, 
+    BillingPeriod billingPeriod, OptimizationGroup optimizationGroup)
+{
+    var deviceAssignments = new List<MobilityCarrierAssignmentExportModel>();
+    foreach (var resultPool in optimizationGroupResultPools)
+    {
+        foreach (var sim in resultPool.SimCards)
+        {
+            var originalRatePool = originalAssignmentCollection.RatePools
+                .FirstOrDefault(x => x.SimCards.TryGetValue(sim.Key, out var _));
+            var deviceAssignment = MobilityCarrierAssignmentExportModel.FromSimCardResult(
+                sim.Value, originalRatePool?.RatePlan, resultPool.RatePlan, 
+                billingPeriod.BillingPeriodStart, optimizationGroup.Name);
+            deviceAssignments.Add(deviceAssignment);
+        }
+    }
+    return deviceAssignments;
+}
+```
+
+#### 3. Cost Analysis by Carrier
+
+##### WHAT:
+Provides comprehensive cost analysis broken down by carrier, showing optimization impact and financial benefits per carrier relationship.
+
+##### WHY:
+- Enables carrier-specific ROI analysis
+- Supports carrier contract negotiations
+- Identifies cost optimization opportunities by carrier
+- Facilitates carrier performance comparisons
+
+##### HOW - Algorithm:
+```
+Algorithm: GenerateMobilityCostAnalysisByCarrier
+Input: optimizationGroups, deviceResults, ratePlans
+Output: costAnalysisByCarrier
+
+1. ORGANIZE DATA BY CARRIER:
+   a. Group optimization groups by carrier
+   b. Group rate plans by carrier
+   c. Group device results by carrier
+
+2. CALCULATE CARRIER COSTS:
+   a. FOR each carrier:
+      - Sum original costs across all devices
+      - Sum optimized costs across all devices
+      - Calculate total carrier cost savings
+      - Compute carrier-specific utilization metrics
+
+3. ANALYZE RATE PLAN PERFORMANCE:
+   a. FOR each carrier's rate plans:
+      - Device count per rate plan
+      - Average cost per device per plan
+      - Optimization success rate per plan
+      - Usage efficiency per plan
+
+4. GENERATE CARRIER COMPARISONS:
+   a. Cost per MB by carrier
+   b. Optimization effectiveness by carrier
+   c. Device distribution by carrier
+   d. Savings percentage by carrier
+
+5. CREATE COST ANALYSIS REPORTS:
+   a. Carrier summary tables
+   b. Cost breakdown charts
+   c. Performance comparison matrices
+   d. Trend analysis over time
+```
+
+##### Code Location:
+```csharp
+// Lines 673-696: Original vs optimized cost calculation
+var originalRatePools = RatePoolFactory.CreateRatePools(ratePlans, billingPeriod, 
+    usesProration, OptimizationChargeType.RateChargeAndOverage);
+var originalAssignmentCollection = RatePoolCollectionFactory.CreateRatePoolCollection(
+    originalRatePools, shouldPoolByOptimizationGroup: true);
+
+foreach (SimCardResult deviceResult in groupDeviceResults)
+{
+    // Add device to original assignment collection
+    foreach (var ratePool in originalAssignmentCollection.RatePools)
+    {
+        if (ratePool.RatePlan.Id == deviceResult.StartingRatePlanId)
+        {
+            ratePool.AddSimCard(deviceResult.ToSimCard());
+            break;
+        }
+    }
+    // Add device to optimized result collection
+    foreach (var ratePool in optimizationGroupResultPools)
+    {
+        if (ratePool.RatePlan.Id == deviceResult.RatePlanId)
+        {
+            ratePool.AddSimCard(deviceResult);
+            break;
+        }
+    }
+}
+
+// Lines 715-716: Final Excel generation with cost analysis
+var assignmentXlsxBytes = RatePoolAssignmentWriter.WriteOptimizationResultSheet(
+    deviceAssignments, summariesByRatePlans);
+```
+
+## Shared Components Between M2M and Mobility
+
+### Device Result Processing
+
+Both M2M and Mobility reports share common device result processing patterns:
+
+#### Code Location:
+```csharp
+// Lines 1073-1128: Common SimCard result parsing
+private SimCardResult SimCardResultFromReader(SqlDataReader rdr, BillingPeriod billingPeriod)
+{
+    // Extracts: ICCID, MSISDN, UsageMB, ChargeAmt, RatePlanCode
+    // Calculates: billing period activation, cost allocation
+    // Handles: SMS usage, base rates, overage charges
+}
+
+// Lines 899-939: Mobility device results retrieval
+private List<SimCardResult> GetMobilityResults(KeySysLambdaContext context, 
+    List<long> queueIds, BillingPeriod billingPeriod)
+
+// Lines 1005-1046: Mobility shared pool results
+private List<SimCardResult> GetMobilitySharedPoolResults(KeySysLambdaContext context, 
+    List<long> queueIds, BillingPeriod billingPeriod)
+```
+
+### Excel Report Generation
+
+Both portal types use similar Excel generation patterns:
+
+#### Code Location:
+```csharp
+// M2M Excel Generation - Lines 789-790:
+var assignmentXlsxBytes = RatePoolAssignmentWriter.GenerateExcelFileFromByteArrays(
+    statFileBytes, assignmentFileBytes, sharedPoolStatFileBytes, sharedPoolAssignmentFileBytes);
+
+// Mobility Excel Generation - Lines 715-716:
+var assignmentXlsxBytes = RatePoolAssignmentWriter.WriteOptimizationResultSheet(
+    deviceAssignments, summariesByRatePlans);
+```
+
+This comprehensive algorithmic breakdown provides clear understanding of how M2M and Mobility reports are generated, with specific focus on the business value and technical implementation of each report type.
