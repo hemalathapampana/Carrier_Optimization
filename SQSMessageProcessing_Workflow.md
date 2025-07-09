@@ -16,28 +16,15 @@ This document analyzes the SQS message processing workflow in the AltaworxJasper
 
 #### What
 **What does Receive SQS Message do?**
-- Receives SQS event containing device synchronization job requests
-- Processes multiple message records from the SQS queue
-- Extracts message metadata including MessageId, EventSource, and Body
-- Initiates the device synchronization workflow for each message record
-- Logs message reception details for monitoring and debugging
+Receives SQS event containing device synchronization job requests and initiates the device synchronization workflow for each message record.
 
 #### Why
 **Why is Receive SQS Message needed?**
-- **Enables asynchronous processing** by decoupling device sync requests from immediate processing requirements
-- **Provides scalable architecture** allowing multiple Lambda instances to process device sync jobs in parallel
-- **Ensures reliable message delivery** through SQS's guaranteed delivery and retry mechanisms
-- **Supports batch processing** by handling multiple device sync requests in a single Lambda invocation
-- **Facilitates monitoring** by providing message tracing through unique message identifiers
-- **Enables fault tolerance** through SQS dead letter queue integration for failed message handling
+Enables asynchronous processing by decoupling device sync requests from immediate processing requirements while providing scalable architecture for parallel processing.
 
 #### How
 **How does Receive SQS Message work?**
-- Lambda function triggered by SQS event containing message records
-- Iterates through each record in the SQS event for processing
-- Extracts and logs message attributes for traceability
-- Initializes processing context for each message record
-- Passes control to message parsing for attribute extraction
+Lambda function triggered by SQS event iterates through message records, extracts metadata, and initializes processing context for each record.
 
 ### Algorithm Description
 
@@ -101,28 +88,15 @@ foreach (var record in sqsEvent.Records)
 
 #### What
 **What does Parse Attributes do?**
-- Extracts message attributes from SQS message into structured data object
-- Parses pagination parameters (PageNumber, LastSyncDate) for device retrieval
-- Extracts service provider identification and optimization session details
-- Converts string message attributes into appropriate data types
-- Creates GetDeviceQueueSqsValues object containing all parsed parameters
+Extracts message attributes from SQS message into structured data object and converts string attributes into appropriate data types for business logic processing.
 
 #### Why
 **Why is Parse Attributes needed?**
-- **Enables type-safe processing** by converting string attributes to appropriate data types for business logic
-- **Centralizes attribute extraction** providing consistent parsing logic across all message processing scenarios
-- **Supports parameter validation** by extracting attributes into structured format for validation
-- **Facilitates debugging** by organizing message parameters in easily accessible object structure
-- **Enables business logic processing** by providing parsed parameters in format expected by downstream processes
-- **Supports error handling** by validating attribute existence and format during parsing
+Enables type-safe processing by centralizing attribute extraction and providing consistent parsing logic across all message processing scenarios.
 
 #### How
 **How does Parse Attributes work?**
-- Creates GetDeviceQueueSqsValues object from SQS message record
-- Extracts required attributes like ServiceProviderId, PageNumber, LastSyncDate
-- Parses optional attributes like OptimizationSessionId and OptimizationInstanceId
-- Validates attribute format and converts to appropriate data types
-- Initializes error collection for capturing parsing failures
+Creates GetDeviceQueueSqsValues object from SQS message record, extracts required and optional attributes, validates formats, and converts to appropriate data types.
 
 ### Algorithm Description
 
@@ -199,28 +173,15 @@ return new GetDeviceQueueSqsValues(context, message);
 
 #### What
 **What does Validate Authentication do?**
-- Retrieves Jasper API authentication credentials for the specified service provider
-- Validates authentication information exists and is properly configured
-- Loads API endpoint URLs, username, password, and billing configuration details
-- Ensures authentication credentials are valid for API access
-- Provides authenticated connection details for subsequent API calls
+Retrieves Jasper API authentication credentials for the specified service provider and validates that authentication information exists and is properly configured for API access.
 
 #### Why
 **Why is Validate Authentication needed?**
-- **Ensures API access authorization** by validating credentials before making expensive API calls
-- **Prevents unauthorized access** by confirming service provider has valid Jasper API authentication
-- **Reduces API call failures** by validating authentication before processing begins
-- **Supports multi-tenant architecture** by loading provider-specific authentication configurations
-- **Enables early failure detection** by catching authentication issues before device processing
-- **Maintains security** by ensuring only authorized service providers can access device data
+Ensures API access authorization by validating credentials before making expensive API calls while preventing unauthorized access and supporting multi-tenant architecture.
 
 #### How
 **How does Validate Authentication work?**
-- Calls JasperCommon.GetJasperAuthenticationInformation with service provider ID
-- Retrieves authentication details from central database
-- Validates authentication object is not null and contains required credentials
-- Logs warning and skips processing if authentication is invalid
-- Provides authenticated API connection details for device API calls
+Calls JasperCommon.GetJasperAuthenticationInformation with service provider ID, retrieves authentication details from central database, and validates credentials before providing authenticated connection details.
 
 ### Algorithm Description
 
@@ -299,28 +260,15 @@ else
 
 #### What
 **What does Process Device List do?**
-- Retrieves device information from Jasper API using paginated requests
-- Processes device data and stores it in staging database tables
-- Handles pagination to fetch all available devices within processing limits
-- Updates device information in the main database through stored procedures
-- Manages device list processing with retry policies for resilience
+Retrieves device information from Jasper API using paginated requests and processes device data by storing it in staging database tables with bulk operations.
 
 #### Why
 **Why is Process Device List needed?**
-- **Synchronizes device data** by fetching latest device information from Jasper API for optimization processing
-- **Handles large datasets** by implementing pagination to process device lists that exceed API limits
-- **Ensures data consistency** by updating staging and production databases with latest device information
-- **Provides fault tolerance** by implementing retry policies for API calls and database operations
-- **Supports optimization workflows** by providing current device data required for rate plan optimization
-- **Manages processing limits** by controlling pagination to stay within Lambda execution constraints
+Synchronizes device data by fetching latest device information from Jasper API for optimization processing while handling large datasets through pagination within processing limits.
 
 #### How
 **How does Process Device List work?**
-- Makes paginated API calls to Jasper API to retrieve device information
-- Stores device data in staging database tables using bulk operations
-- Processes multiple pages until last page reached or processing limits exceeded
-- Updates main device tables through stored procedure calls
-- Handles errors with retry policies and continues processing where possible
+Makes paginated API calls to Jasper API, stores device data in staging tables using bulk operations, and updates main device tables through stored procedures with retry policies.
 
 ### Algorithm Description
 
@@ -399,28 +347,15 @@ await ProcessDeviceList(keysysContext, sqsValues, jasperAuth);
 
 #### What
 **What does Handle Errors do?**
-- Collects and manages errors that occur during device processing
-- Implements retry policies for transient failures (SQL, HTTP, general operations)
-- Sends error notification emails when error thresholds are exceeded
-- Integrates with optimization error handling for carrier optimization workflows
-- Provides fallback mechanisms to continue processing despite non-critical errors
+Collects and manages errors that occur during device processing while implementing retry policies for transient failures and sending error notification emails when thresholds are exceeded.
 
 #### Why
 **Why is Handle Errors needed?**
-- **Ensures system resilience** by providing retry mechanisms for transient failures that could otherwise stop processing
-- **Prevents data loss** by implementing fallback strategies that allow processing to continue with partial failures
-- **Provides visibility** by sending email notifications when error thresholds indicate systemic issues
-- **Supports debugging** by collecting detailed error information for troubleshooting
-- **Maintains workflow continuity** by handling errors gracefully without terminating entire processing pipelines
-- **Enables monitoring** by integrating error handling with optimization session tracking and alerting
+Ensures system resilience by providing retry mechanisms for transient failures while preventing data loss through fallback strategies and maintaining workflow continuity.
 
 #### How
 **How does Handle Errors work?**
-- Uses Polly retry policies with exponential backoff for different failure types
-- Collects errors in structured format throughout processing pipeline
-- Checks error counts against thresholds to determine continuation or termination
-- Sends email notifications when error limits exceeded or critical failures occur
-- Integrates with optimization session error handling for carrier optimization workflows
+Uses Polly retry policies with exponential backoff for different failure types, collects errors in structured format, and sends notifications when limits are exceeded or integrates with optimization session error handling.
 
 ### Algorithm Description
 
@@ -507,28 +442,15 @@ if (sqsValues.Errors.Count > 0)
 
 #### What
 **What does Queue Next Step do?**
-- Determines appropriate next processing step based on workflow configuration
-- Sends SQS messages to trigger subsequent processing stages
-- Routes to different queues based on NextStep parameter (DeviceUsageByRatePlan, DeviceUsageExport, UpdateDeviceRatePlan)
-- Continues device synchronization pagination if more pages remain
-- Completes workflow orchestration by transitioning to next processing phase
+Determines appropriate next processing step based on workflow configuration and sends SQS messages to trigger subsequent processing stages or continues pagination if more pages remain.
 
 #### Why
 **Why is Queue Next Step needed?**
-- **Enables workflow orchestration** by coordinating multiple processing stages in device synchronization pipeline
-- **Supports asynchronous processing** by decoupling current stage completion from next stage initiation
-- **Provides flexible routing** allowing different workflow paths based on business requirements and processing context
-- **Ensures processing continuity** by automatically transitioning to next required processing step
-- **Supports scalability** by distributing different processing stages across specialized Lambda functions
-- **Maintains state consistency** by preserving processing context and parameters across workflow transitions
+Enables workflow orchestration by coordinating multiple processing stages in device synchronization pipeline while supporting asynchronous processing and flexible routing for different workflow paths.
 
 #### How
 **How does Queue Next Step work?**
-- Evaluates current processing state to determine if pagination should continue
-- If more pages remain, queues next page processing message with incremented page number
-- If processing complete, evaluates NextStep parameter to determine subsequent workflow stage
-- Constructs appropriate SQS message with required parameters for next processing stage
-- Sends message to designated queue URL for next stage processing
+Evaluates current processing state to determine if pagination should continue or if processing is complete, then constructs appropriate SQS message and sends it to designated queue URL for next stage processing.
 
 ### Algorithm Description
 
