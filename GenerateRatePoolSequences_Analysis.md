@@ -4,7 +4,7 @@
 
 The `GenerateRatePoolSequences()` function is a critical component of the Altaworx SIM Card Cost Optimization System that creates permutations of rate plans within a rate pool collection for optimization testing.
 
-## What, Why, How Analysis
+## What, Who, How Analysis
 
 ### What
 
@@ -15,15 +15,15 @@ The `GenerateRatePoolSequences()` function is a critical component of the Altawo
 - Limits sequences to prevent combinatorial explosion
 - Returns a collection of `RatePlanSequence` objects containing ordered rate plan IDs
 
-### Why
+### Who
 
-**Why is GenerateRatePoolSequences() needed?**
-- Enables comprehensive testing of different rate plan assignment combinations
-- Provides systematic exploration of optimization possibilities across device groups
-- Prevents manual enumeration of complex rate plan permutations
-- Ensures optimal cost savings by testing multiple assignment strategies
-- Supports both M2M and Mobility carrier optimization workflows
-- Addresses the need to find the most cost-effective rate plan assignments for SIM card pools
+**Who uses GenerateRatePoolSequences()?**
+- **QueueCarrierPlanOptimization service** - Primary caller that orchestrates carrier plan optimization workflows
+- **M2M optimization processes** - Uses standard sequence generation for machine-to-machine device optimization
+- **Mobility optimization processes** - Uses the specialized variant for mobile device optimization with rate plan type filtering
+- **Lambda optimization instances** - Distributed workers that process the generated sequences in parallel
+- **Telecommunications administrators** - Indirect beneficiaries who receive optimized rate plan assignments
+- **Cost optimization engineers** - System operators who monitor and maintain the optimization algorithms
 
 ### How
 
