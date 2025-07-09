@@ -261,7 +261,7 @@ if (ratePoolSequences.Count > OptimizationConstant.RATE_PLAN_SEQUENCES_FIRST_INS
 
 ## 4. Type-Specific Optimization
 
-### What, Who, How Analysis
+### What, How Analysis
 
 #### What
 **What does Type-Specific Optimization do?**
@@ -270,15 +270,6 @@ if (ratePoolSequences.Count > OptimizationConstant.RATE_PLAN_SEQUENCES_FIRST_INS
 - Customizes cost models based on service type (data efficiency, voice patterns, messaging usage)
 - Applies type-specific constraints and preferences in assignment decisions
 - Optimizes service-specific metrics like data utilization efficiency or call pattern matching
-
-#### Who
-**Who uses Type-Specific Optimization?**
-- **Optimization execution engines** - Apply type-specific algorithms during assignment processing
-- **Cost calculation modules** - Use type-specific formulas for accurate cost projections
-- **Business rule engines** - Implement service-specific constraints and preferences
-- **Service optimization specialists** - Configure and maintain type-specific optimization parameters
-- **Telecommunications engineers** - Design optimization strategies for different service characteristics
-- **Financial analysts** - Monitor type-specific cost savings and optimization effectiveness
 
 #### How
 **How does Type-Specific Optimization work?**
@@ -291,55 +282,83 @@ if (ratePoolSequences.Count > OptimizationConstant.RATE_PLAN_SEQUENCES_FIRST_INS
 ### Algorithm Description
 
 ```
-TYPE-SPECIFIC OPTIMIZATION ALGORITHM:
+TYPE-SPECIFIC OPTIMIZATION ALGORITHM (Code-Based Implementation):
 
-INPUT: Type-classified rate plans and optimization requirements
+INPUT: 
+- instance.PortalType (M2M, Mobility, CrossProvider)
+- ratePools with RatePlanTypeId classifications
+- optimizationGroupSimCards filtered by type
+- shouldFilterByRatePlanType boolean flag
 
-PROCESS:
-1. TYPE IDENTIFICATION
-   - Determine primary and secondary service types
-   - Load type-specific optimization parameters
-   - Select appropriate algorithm branch
-   - Initialize type-specific metrics
+ALGORITHM:
+1. TYPE_FILTER_INITIALIZATION:
+   if (instance.PortalType == PortalTypes.Mobility && !instance.IsCustomerOptimization) {
+       shouldFilterByRatePlanType = true;
+       shouldPoolUsageBetweenRatePlans = ratePoolCollection.IsPooled;
+   }
 
-2. SERVICE-SPECIFIC PROCESSING
-   - DATA PLANS:
-     * Optimize for data utilization efficiency
-     * Calculate cost per MB and overage rates
-     * Match usage patterns to data allowances
-     * Minimize data waste and overage costs
+2. RATE_PLAN_TYPE_EXTRACTION:
+   ratePlanTypes = groupRatePlans.Select(x => x.RatePlanTypeId);
    
-   - VOICE PLANS:
-     * Optimize for call pattern compatibility
-     * Calculate cost per minute efficiency
-     * Match geographic coverage requirements
-     * Optimize minute utilization rates
-   
-   - SMS PLANS:
-     * Focus on message volume optimization
-     * Calculate cost per message efficiency
-     * Consider delivery reliability requirements
-     * Optimize messaging allowance utilization
-   
-   - BUNDLE PLANS:
-     * Multi-service cost optimization
-     * Cross-service usage analysis
-     * Bundle efficiency calculations
-     * Service combination optimization
+3. DEVICE_FILTERING_BY_TYPE:
+   optimizationGroupSimCards = allSimCards
+       .Where(x => ratePlanTypes.Contains(x.RatePlanTypeId))
+       .ToList();
 
-3. CONSTRAINT APPLICATION
-   - Apply type-specific business rules
-   - Enforce service level requirements
-   - Validate compatibility constraints
-   - Check regulatory compliance
+4. TYPE_SPECIFIC_DEVICE_ASSIGNMENT:
+   groupSimCardCount = BaseDeviceAssignment(
+       context: context,
+       instanceId: instance.Id,
+       commGroupId: sameRatePlansCollectionId,
+       serviceProviderId: serviceProviderId,
+       commPlans: null,
+       commPlanIds: null,
+       optimizationGroupNames: new() { optimizationGroup.Name },
+       ratePoolCollection: ratePoolCollection,
+       ratePools: ratePools,
+       simCards: optimizationGroupSimCards,
+       billingPeriod: billingPeriod,
+       usesProration: usesProration,
+       shouldFilterByRatePlanType: true  // KEY TYPE-SPECIFIC FLAG
+   );
 
-4. OPTIMIZATION EXECUTION
-   - Execute type-optimized assignment algorithms
-   - Calculate type-specific cost metrics
-   - Apply service-specific scoring functions
-   - Validate optimization results
+5. TYPE_SPECIFIC_SEQUENCE_GENERATION:
+   if (shouldFilterByRatePlanType) {
+       ratePoolSequences = RatePoolAssigner.GenerateRatePoolSequencesByRatePlanTypes(
+           ratePoolCollection.RatePools
+       );
+   } else {
+       ratePoolSequences = RatePoolAssigner.GenerateRatePoolSequences(
+           ratePoolCollection.RatePools
+       );
+   }
 
-OUTPUT: Type-optimized assignments with service-specific cost savings
+6. PORTAL_TYPE_SPECIFIC_PROCESSING:
+   switch (instance.PortalType) {
+       case PortalTypes.M2M:
+           // Standard rate plan optimization without type filtering
+           break;
+       case PortalTypes.Mobility:
+           // Enable type filtering and pooling capabilities
+           // Apply mobility-specific business rules
+           break;
+       case PortalTypes.CrossProvider:
+           // Cross-provider optimization logic
+           break;
+   }
+
+7. TYPE_SPECIFIC_VALIDATION:
+   if (deviceResults.Any(x => x.RatePlanTypeId == null || x.OptimizationGroupId == null)) {
+       // Filter out results with invalid type assignments
+       validResults = deviceResults
+           .Where(x => x.RatePlanTypeId != null && x.OptimizationGroupId != null)
+           .ToList();
+   }
+
+OUTPUT: 
+- Type-filtered device assignments
+- Type-specific rate pool sequences
+- Portal-type optimized results
 ```
 
 ### Code Location and Usage
