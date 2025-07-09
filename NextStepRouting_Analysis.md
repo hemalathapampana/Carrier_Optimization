@@ -29,19 +29,58 @@ If optimization_queue ≠ ∅:
     Message_body ← "Get Optimization Usage for Service Provider {ServiceProviderId}"
 ```
 
-### Code Locations
-**File**: `AltaworxJasperAWSGetDevicesQueue.cs`
+### Code Implementation
+```csharp
+// Main routing switch case
+case JasperDeviceSyncNextStep.DeviceUsageByRatePlan:
+    await SendMessageToDeviceUsageByRatePlanQueue(context, OptimizationUsageQueueURL, sqsValues);
+    break;
 
-| Component | Line(s) | Code Reference |
-|-----------|---------|----------------|
-| **Main Switch Case** | 208-210 | `case JasperDeviceSyncNextStep.DeviceUsageByRatePlan:` |
-| **Method Invocation** | 209 | `await SendMessageToDeviceUsageByRatePlanQueue(context, OptimizationUsageQueueURL, sqsValues);` |
-| **Method Declaration** | 414 | `private async Task SendMessageToDeviceUsageByRatePlanQueue(...)` |
-| **Queue URL Variable** | 48 | `private string OptimizationUsageQueueURL = Environment.GetEnvironmentVariable("OptimizationUsageQueueURL");` |
-| **Message Body** | 427 | `var requestMsgBody = $"Get Optimization Usage for Service Provider {sqsValues.ServiceProviderId}";` |
-| **Message Attributes** | 432-449 | ServiceProviderId, RatePlanId, PageNumber, Initialize |
-| **OptimizationSessionId** | 452-454 | Conditional addition of OptimizationSessionId attribute |
-| **SQS Send** | 456 | `var response = await client.SendMessageAsync(request);` |
+// Queue URL configuration
+private string OptimizationUsageQueueURL = Environment.GetEnvironmentVariable("OptimizationUsageQueueURL");
+
+// Method implementation
+private async Task SendMessageToDeviceUsageByRatePlanQueue(KeySysLambdaContext context, string optimizationUsageQueueURL, GetDeviceQueueSqsValues sqsValues, int currentRatePlanId = 0, int currentPageNumber = 1)
+{
+    var awsCredentials = AwsCredentials(context);
+    using (var client = new AmazonSQSClient(awsCredentials, RegionEndpoint.USEast1))
+    {
+        var requestMsgBody = $"Get Optimization Usage for Service Provider {sqsValues.ServiceProviderId}";
+        var request = new SendMessageRequest
+        {
+            DelaySeconds = DefaultDelaySeconds,
+            MessageAttributes = new Dictionary<string, MessageAttributeValue>
+            {
+                {
+                    "ServiceProviderId", new MessageAttributeValue
+                        { DataType = "String", StringValue = sqsValues.ServiceProviderId.ToString()}
+                },
+                {
+                    "RatePlanId", new MessageAttributeValue
+                        { DataType = "String", StringValue = currentRatePlanId.ToString()}
+                },
+                {
+                    "PageNumber", new MessageAttributeValue
+                        { DataType = "String", StringValue = currentPageNumber.ToString()}
+                },
+                {
+                    "Initialize", new MessageAttributeValue
+                        { DataType = "String", StringValue = false.ToString()}
+                }
+            },
+            MessageBody = requestMsgBody,
+            QueueUrl = optimizationUsageQueueURL
+        };
+
+        if (sqsValues.OptimizationSessionId != null && sqsValues.OptimizationSessionId.Value > 0)
+        {
+            request.MessageAttributes.Add("OptimizationSessionId", new MessageAttributeValue { DataType = "String", StringValue = sqsValues.OptimizationSessionId.Value.ToString() });
+        }
+
+        var response = await client.SendMessageAsync(request);
+    }
+}
+```
 
 ---
 
@@ -68,19 +107,57 @@ If export_queue ≠ ∅:
     Message_body ← "Requesting email to process"
 ```
 
-### Code Locations
-**File**: `AltaworxJasperAWSGetDevicesQueue.cs`
+### Code Implementation
+```csharp
+// Main routing switch case
+case JasperDeviceSyncNextStep.DeviceUsageExport:
+    await SendMessageToGetExportDeviceUsageQueueAsync(context, sqsValues, ExportDeviceUsageQueueURL);
+    break;
 
-| Component | Line(s) | Code Reference |
-|-----------|---------|----------------|
-| **Main Switch Case** | 211-213 | `case JasperDeviceSyncNextStep.DeviceUsageExport:` |
-| **Method Invocation** | 212 | `await SendMessageToGetExportDeviceUsageQueueAsync(context, sqsValues, ExportDeviceUsageQueueURL);` |
-| **Method Declaration** | 465 | `private async Task SendMessageToGetExportDeviceUsageQueueAsync(...)` |
-| **Queue URL Variable** | 47 | `private string ExportDeviceUsageQueueURL = Environment.GetEnvironmentVariable("ExportDeviceUsageQueueURL");` |
-| **Initialization Flag** | 467 | `var initializeProcessing = true;` |
-| **Message Body** | 476 | `var requestMsgBody = $"Requesting email to process";` |
-| **Message Attributes** | 482-496 | InitializeProcessing, WaitCount, ServiceProviderId |
-| **SQS Send** | 504 | `var response = await client.SendMessageAsync(request);` |
+// Queue URL configuration
+private string ExportDeviceUsageQueueURL = Environment.GetEnvironmentVariable("ExportDeviceUsageQueueURL");
+
+// Method implementation
+private async Task SendMessageToGetExportDeviceUsageQueueAsync(KeySysLambdaContext context, GetDeviceQueueSqsValues sqsValues, string exportDeviceUsageQueueURL)
+{
+    var initializeProcessing = true;
+
+    var awsCredentials = AwsCredentials(context);
+    using (var client = new AmazonSQSClient(awsCredentials, RegionEndpoint.USEast1))
+    {
+        var requestMsgBody = $"Requesting email to process";
+        var request = new SendMessageRequest
+        {
+            DelaySeconds = DefaultDelaySeconds,
+            MessageAttributes = new Dictionary<string, MessageAttributeValue>
+            {
+                {
+                    "InitializeProcessing", new MessageAttributeValue
+                    {
+                        DataType = "String", StringValue = initializeProcessing.ToString()
+                    }
+                },
+                {
+                    "WaitCount", new MessageAttributeValue
+                    {
+                        DataType = "String", StringValue = 0.ToString()
+                    }
+                },
+                {
+                    "ServiceProviderId", new MessageAttributeValue
+                    {
+                        DataType = "String", StringValue = sqsValues.ServiceProviderId.ToString()
+                    }
+                }
+            },
+            MessageBody = requestMsgBody,
+            QueueUrl = exportDeviceUsageQueueURL
+        };
+
+        var response = await client.SendMessageAsync(request);
+    }
+}
+```
 
 ---
 
@@ -105,42 +182,78 @@ If update_queue ≠ ∅:
     Message_body ← "NOT USED"
 ```
 
-### Code Locations
-**File**: `AltaworxJasperAWSGetDevicesQueue.cs`
+### Code Implementation
+```csharp
+// Main routing switch case
+case JasperDeviceSyncNextStep.UpdateDeviceRatePlan:
+    await SendMessageToUpdateRatePlanQueueAsync(context, sqsValues, RatePlanUpdateQueueURL);
+    break;
 
-| Component | Line(s) | Code Reference |
-|-----------|---------|----------------|
-| **Main Switch Case** | 214-216 | `case JasperDeviceSyncNextStep.UpdateDeviceRatePlan:` |
-| **Method Invocation** | 215 | `await SendMessageToUpdateRatePlanQueueAsync(context, sqsValues, RatePlanUpdateQueueURL);` |
-| **Method Declaration** | 513 | `private async Task SendMessageToUpdateRatePlanQueueAsync(...)` |
-| **Queue URL Variable** | 49 | `private string RatePlanUpdateQueueURL = Environment.GetEnvironmentVariable("RatePlanUpdateQueueURL");` |
-| **Message Body** | 543 | `MessageBody = "NOT USED",` |
-| **Message Attributes** | 529-540 | InstanceId, SyncedDevices |
-| **SQS Send** | 545 | `var response = await client.SendMessageAsync(request);` |
+// Queue URL configuration
+private string RatePlanUpdateQueueURL = Environment.GetEnvironmentVariable("RatePlanUpdateQueueURL");
+
+// Method implementation
+private async Task SendMessageToUpdateRatePlanQueueAsync(KeySysLambdaContext context, GetDeviceQueueSqsValues sqsValues, string queueUrl)
+{
+    var awsCredentials = AwsCredentials(context);
+    using (var client = new AmazonSQSClient(awsCredentials, RegionEndpoint.USEast1))
+    {
+        var request = new SendMessageRequest
+        {
+            DelaySeconds = DefaultDelaySeconds,
+            MessageAttributes = new Dictionary<string, MessageAttributeValue>
+            {
+                {
+                    "InstanceId", new MessageAttributeValue
+                    {
+                        DataType = "Number", StringValue = sqsValues.OptimizationInstanceId.ToString()
+                    }
+                },
+                {
+                    "SyncedDevices", new MessageAttributeValue
+                    {
+                        DataType = "String", StringValue = true.ToString()
+                    }
+                }
+            },
+            MessageBody = "NOT USED",
+            QueueUrl = queueUrl
+        };
+
+        var response = await client.SendMessageAsync(request);
+    }
+}
+```
 
 ---
 
 ## Control Flow Summary
 
-### ProcessNextStep Method
-**Location**: Lines 205-219
-
+### Main ProcessNextStep Method
 ```csharp
 private async Task ProcessNextStep(KeySysLambdaContext context, GetDeviceQueueSqsValues sqsValues)
 {
     switch (sqsValues.NextStep)
     {
-        case JasperDeviceSyncNextStep.DeviceUsageByRatePlan:     // Line 208
-        case JasperDeviceSyncNextStep.DeviceUsageExport:        // Line 211  
-        case JasperDeviceSyncNextStep.UpdateDeviceRatePlan:     // Line 214
-        default:                                                // Line 217
+        case JasperDeviceSyncNextStep.DeviceUsageByRatePlan:
+            await SendMessageToDeviceUsageByRatePlanQueue(context, OptimizationUsageQueueURL, sqsValues);
+            break;
+        case JasperDeviceSyncNextStep.DeviceUsageExport:
+            await SendMessageToGetExportDeviceUsageQueueAsync(context, sqsValues, ExportDeviceUsageQueueURL);
+            break;
+        case JasperDeviceSyncNextStep.UpdateDeviceRatePlan:
+            await SendMessageToUpdateRatePlanQueueAsync(context, sqsValues, RatePlanUpdateQueueURL);
+            break;
+        default:
+            LogInfo(context, "EXCEPTION", $"Unknown usage sync type: {sqsValues.NextStep}");
+            break;
     }
 }
 ```
 
-### Queue URL Environment Variables
-| Queue Type | Variable | Line | Environment Key |
-|------------|----------|------|-----------------|
-| **Optimization** | OptimizationUsageQueueURL | 48 | "OptimizationUsageQueueURL" |
-| **Export** | ExportDeviceUsageQueueURL | 47 | "ExportDeviceUsageQueueURL" |
-| **Rate Plan Update** | RatePlanUpdateQueueURL | 49 | "RatePlanUpdateQueueURL" |
+### Environment Configuration
+```csharp
+private string OptimizationUsageQueueURL = Environment.GetEnvironmentVariable("OptimizationUsageQueueURL");
+private string ExportDeviceUsageQueueURL = Environment.GetEnvironmentVariable("ExportDeviceUsageQueueURL");
+private string RatePlanUpdateQueueURL = Environment.GetEnvironmentVariable("RatePlanUpdateQueueURL");
+```
