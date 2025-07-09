@@ -41,46 +41,46 @@ This document provides detailed analysis of the four key sequence characteristic
 SEQUENCE ORDERING ALGORITHM:
 
 INPUT: 
-- Generated rate plan sequences
-- Cost calculation parameters
-- Optimization potential metrics
+- Set of generated rate plan sequences S = {s₁, s₂, ..., sₙ}
+- Cost calculation parameters C
+- Optimization potential metrics M
 
 ALGORITHM:
-1. COST_EFFECTIVENESS_CALCULATION:
-   For each sequence in the collection:
-   - Calculate estimated total cost for sequence implementation
-   - Determine potential cost savings compared to current assignments
-   - Assess optimization efficiency metrics
-   - Compute cost-per-device ratios
+1. COST_EFFECTIVENESS_EVALUATION:
+   For each sequence sᵢ ∈ S:
+   - Compute total implementation cost: cost(sᵢ)
+   - Calculate potential savings: savings(sᵢ) = current_cost - cost(sᵢ)
+   - Determine efficiency ratio: efficiency(sᵢ) = savings(sᵢ) / cost(sᵢ)
+   - Assess device coverage impact: coverage(sᵢ)
 
-2. OPTIMIZATION_POTENTIAL_ASSESSMENT:
-   - Evaluate sequence coverage and diversity benefits
-   - Calculate expected usage efficiency improvements
-   - Assess compatibility with device usage patterns
-   - Determine pooling advantages where applicable
+2. OPTIMIZATION_POTENTIAL_MEASUREMENT:
+   - Evaluate sequence diversity score: diversity(sᵢ)
+   - Measure usage pattern alignment: alignment(sᵢ)
+   - Calculate pooling benefit coefficient: pooling(sᵢ)
+   - Determine service compatibility index: compatibility(sᵢ)
 
-3. RANKING_CALCULATION:
-   - Combine cost savings with optimization potential
-   - Apply weighting factors for different cost components
-   - Calculate composite effectiveness scores
-   - Normalize scores across different sequence types
+3. COMPOSITE_SCORING:
+   - Define weighting vector: W = [w₁, w₂, w₃, w₄]
+   - Calculate effectiveness score: 
+     effectiveness(sᵢ) = w₁×efficiency(sᵢ) + w₂×diversity(sᵢ) + w₃×alignment(sᵢ) + w₄×pooling(sᵢ)
+   - Normalize scores across all sequences: normalized_score(sᵢ)
 
-4. SEQUENCE_SORTING:
-   - Sort sequences by composite effectiveness score (ascending cost)
-   - Apply tie-breaking rules for equal scores
-   - Maintain stable ordering for consistent processing
-   - Preserve sequence metadata and identifiers
+4. SEQUENCE_ORDERING:
+   - Arrange sequences in ascending order of total cost
+   - Apply secondary ordering by effectiveness score for ties
+   - Maintain deterministic ordering for reproducible results
+   - Preserve sequence identifiers and metadata
 
-5. PRIORITY_ASSIGNMENT:
-   - Assign processing priorities based on sorted order
-   - Mark high-priority sequences for immediate processing
-   - Flag low-priority sequences for deferred processing
-   - Update sequence metadata with priority information
+5. PRIORITY_CLASSIFICATION:
+   - Partition ordered sequences into priority levels
+   - Assign high priority to top percentile sequences
+   - Mark medium priority for middle range sequences
+   - Flag low priority for remaining sequences
 
 OUTPUT: 
-- Ordered sequence collection with cost-effectiveness ranking
-- Priority metadata for processing optimization
-- Cost effectiveness scores for each sequence
+- Ordered sequence set O = {o₁, o₂, ..., oₙ} where cost(o₁) ≤ cost(o₂) ≤ ... ≤ cost(oₙ)
+- Priority classification P = {high, medium, low} for each sequence
+- Effectiveness scores E = {e₁, e₂, ..., eₙ}
 ```
 
 ### Code Location and Usage
@@ -137,47 +137,47 @@ OUTPUT:
 SEQUENCE FILTERING ALGORITHM:
 
 INPUT: 
-- Generated rate plan sequences
-- Business rules and constraints
-- Compatibility requirements
-- Resource availability limits
+- Initial sequence set S = {s₁, s₂, ..., sₙ}
+- Business rule set R = {r₁, r₂, ..., rₘ}
+- Compatibility constraint matrix C
+- Resource capacity vector L = [l₁, l₂, ..., lₖ]
 
 ALGORITHM:
 1. BUSINESS_RULE_VALIDATION:
-   For each sequence:
-   - Check compliance with rate plan combination rules
-   - Validate service type compatibility requirements
-   - Ensure geographic coverage consistency
-   - Verify billing period alignment
+   For each sequence sᵢ ∈ S:
+   - Apply rule validation function: valid(sᵢ, rⱼ) → {true, false} ∀rⱼ ∈ R
+   - Check service type consistency: consistent_types(sᵢ)
+   - Verify geographic coverage requirements: coverage_valid(sᵢ)
+   - Validate billing alignment: billing_aligned(sᵢ)
 
-2. COMPATIBILITY_CHECKING:
-   - Validate rate plan type compatibility within sequence
-   - Check device-plan compatibility requirements
-   - Ensure service level consistency
-   - Verify carrier and provider compatibility
+2. COMPATIBILITY_ASSESSMENT:
+   - Test rate plan type compatibility: type_compatible(sᵢ) = ∧(compatible(pₐ, pᵦ)) ∀pₐ,pᵦ ∈ sᵢ
+   - Evaluate device-plan alignment: device_plan_match(sᵢ)
+   - Verify service level requirements: service_level_met(sᵢ)
+   - Check carrier compatibility matrix: carrier_compatible(sᵢ)
 
-3. RESOURCE_CONSTRAINT_VALIDATION:
-   - Check sequence against available capacity limits
-   - Validate against device count constraints
-   - Ensure pooling requirements are met
-   - Verify processing resource availability
+3. RESOURCE_CONSTRAINT_EVALUATION:
+   - Calculate resource demand: demand(sᵢ) = [d₁, d₂, ..., dₖ]
+   - Apply constraint check: feasible(sᵢ) ↔ demand(sᵢ) ≤ L
+   - Validate device count bounds: |devices(sᵢ)| ≤ max_devices
+   - Check pooling capacity: pooling_capacity(sᵢ) ≤ pool_limit
 
-4. TECHNICAL_CONSTRAINT_FILTERING:
-   - Remove sequences exceeding technical limits
-   - Filter based on optimization group requirements
-   - Check portal type compatibility
-   - Validate integration requirements
+4. TECHNICAL_FEASIBILITY_CHECK:
+   - Apply technical limit function: within_limits(sᵢ)
+   - Verify optimization group constraints: group_valid(sᵢ)
+   - Test portal type compatibility: portal_compatible(sᵢ)
+   - Validate integration requirements: integration_valid(sᵢ)
 
-5. QUALITY_FILTERING:
-   - Remove sequences with poor optimization potential
-   - Filter sequences with insufficient diversity
-   - Eliminate sequences with negative cost impact
-   - Remove sequences violating quality thresholds
+5. QUALITY_THRESHOLD_FILTERING:
+   - Calculate optimization potential: potential(sᵢ) ≥ min_potential
+   - Measure diversity index: diversity(sᵢ) ≥ min_diversity
+   - Evaluate cost impact: cost_benefit(sᵢ) > 0
+   - Apply quality score threshold: quality(sᵢ) ≥ quality_threshold
 
 OUTPUT: 
-- Filtered sequence collection meeting all constraints
-- Validation metadata for filtered sequences
-- Compliance confirmation for remaining sequences
+- Filtered sequence subset S' = {s'₁, s'₂, ..., s'ₘ} where S' ⊆ S and m ≤ n
+- Validation result matrix V where V[i,j] indicates if sequence sᵢ passes constraint j
+- Constraint satisfaction indicators for each remaining sequence
 ```
 
 ### Code Location and Usage
@@ -235,47 +235,50 @@ if (deviceResults.Any(x => x.RatePlanTypeId == null || x.OptimizationGroupId == 
 SEQUENCE LIMITS ALGORITHM:
 
 INPUT: 
-- Generated rate plan sequences
-- RATE_PLAN_SEQUENCES_FIRST_INSTANCE_LIMIT constant
-- System resource constraints
+- Sequence collection S with cardinality |S| = n
+- First instance limit threshold L₁
+- System resource capacity vector R = [memory, time, processing_power]
 
 ALGORITHM:
-1. SEQUENCE_COUNT_EVALUATION:
-   sequenceCount = ratePoolSequences.Count
-   firstInstanceLimit = OptimizationConstant.RATE_PLAN_SEQUENCES_FIRST_INSTANCE_LIMIT
+1. CARDINALITY_ASSESSMENT:
+   - Measure sequence count: n = |S|
+   - Define limit threshold: L₁ = first_instance_limit
+   - Calculate overflow amount: overflow = max(0, n - L₁)
 
-2. LIMIT_COMPARISON:
-   if (sequenceCount > firstInstanceLimit):
-       triggerBulkProcessing = true
-       exceedsLimit = true
-   else:
-       triggerStandardProcessing = true
-       exceedsLimit = false
+2. THRESHOLD_EVALUATION:
+   - Apply limit comparison function: exceeds(n, L₁) = (n > L₁)
+   - Determine processing mode:
+     * Standard mode: exceeds(n, L₁) = false
+     * Distributed mode: exceeds(n, L₁) = true
+   - Calculate processing complexity: complexity(S) = f(n, resource_demand(S))
 
-3. PROCESSING_MODE_SELECTION:
-   if (exceedsLimit):
-       // Remove from immediate processing queue
-       sameRatePlansCollectionIds.Remove(sameRatePlansCollectionId)
-       // Trigger bulk operations
-       BulkSaveRatePlanAndSequences(context, serviceProviderId, instance, 
-           usesProration, sameRatePlansCollectionId, ratePoolSequences)
-       // Queue for distributed processing
-       await SendMessageToCreateQueueRatePlans(context, ratePoolSequences, sameRatePlansCollectionId)
-   else:
-       // Standard processing within single instance
-       SaveRatePlanAndSequences(context, serviceProviderId, instance, 
-           usesProration, sameRatePlansCollectionId, commGroupRatePlanTable, ratePoolSequences)
+3. PROCESSING_STRATEGY_SELECTION:
+   - If n ≤ L₁:
+     * Select single-instance processing: mode = STANDARD
+     * Allocate full resource set: allocated_resources = R
+   - If n > L₁:
+     * Select distributed processing: mode = DISTRIBUTED
+     * Partition sequence set: S = S₁ ∪ S₂ ∪ ... ∪ Sₖ
+     * Queue overflow sequences: queue_sequences = S \ S₁
 
-4. RESOURCE_MANAGEMENT:
-   - Monitor memory usage during processing
-   - Track execution time against Lambda limits
-   - Manage queue depths for overflow processing
-   - Optimize processing batch sizes
+4. RESOURCE_ALLOCATION:
+   - Calculate memory requirement: memory_needed = estimate_memory(S)
+   - Estimate processing time: time_needed = estimate_time(S)
+   - Apply resource constraints:
+     * memory_needed ≤ available_memory
+     * time_needed ≤ execution_time_limit
+   - Determine batch size: batch_size = optimize_batch(R, complexity(S))
+
+5. OVERFLOW_MANAGEMENT:
+   - If overflow > 0:
+     * Create overflow partition: S_overflow = {s_{L₁+1}, s_{L₁+2}, ..., sₙ}
+     * Initiate distributed processing: distribute(S_overflow)
+     * Maintain processing order: preserve_sequence_order(S_overflow)
 
 OUTPUT: 
-- Processing mode selection (standard or bulk)
-- Resource allocation for sequence processing
-- Queue management for sequence overflow
+- Processing mode assignment: mode ∈ {STANDARD, DISTRIBUTED}
+- Resource allocation plan: resource_plan = {memory_alloc, time_alloc, instances}
+- Overflow handling strategy: overflow_strategy ∈ {queue, batch, distribute}
 ```
 
 ### Code Location and Usage
@@ -335,46 +338,46 @@ if (ratePoolSequences.Count > OptimizationConstant.RATE_PLAN_SEQUENCES_FIRST_INS
 SEQUENCE BATCHING ALGORITHM:
 
 INPUT: 
-- Large collection of rate plan sequences
-- RATE_PLAN_SEQUENCES_BATCH_SIZE constant
-- SQS message processing requirements
+- Large sequence collection S with cardinality |S| = n
+- Batch size parameter β
+- Message capacity constraints M = [max_size, max_count]
 
 ALGORITHM:
-1. BATCH_SIZE_DETERMINATION:
-   batchSize = OptimizationConstant.RATE_PLAN_SEQUENCES_BATCH_SIZE
-   totalSequences = ratePoolSequences.Count
-   expectedBatches = Math.Ceiling(totalSequences / batchSize)
+1. BATCH_CONFIGURATION:
+   - Define batch size: β = batch_size_constant
+   - Calculate total sequences: n = |S|
+   - Determine number of batches: k = ⌈n/β⌉
+   - Estimate batch distribution: batches = {B₁, B₂, ..., Bₖ}
 
-2. SEQUENCE_CHUNKING:
-   ratePoolBatches = ratePoolSequences.Chunk(batchSize)
-   // Creates enumerable of sequence arrays, each with batchSize elements
+2. SEQUENCE_PARTITIONING:
+   - Partition sequence set: S = B₁ ∪ B₂ ∪ ... ∪ Bₖ where Bᵢ ∩ Bⱼ = ∅ for i ≠ j
+   - Define batch contents: Bᵢ = {s_{(i-1)β+1}, s_{(i-1)β+2}, ..., s_{min(iβ,n)}}
+   - Ensure batch size constraint: |Bᵢ| ≤ β ∀i ∈ {1, 2, ..., k}
+   - Maintain sequence ordering within batches
 
-3. BATCH_PROCESSING:
-   foreach (var sequences in ratePoolBatches):
-       // Create SQS message attributes for batch
-       attributes = {
-           RATE_PLAN_SEQUENCES: JsonSerializer.Serialize(sequences),
-           COMM_GROUP_ID: commGroupId.ToString()
-       }
-       // Send batch as SQS message for processing
-       await sqsService.SendSQSMessage(logger, credentials, queueUrl, attributes)
+3. BATCH_OPTIMIZATION:
+   - Calculate batch load balance: load_variance = var(|B₁|, |B₂|, ..., |Bₖ|)
+   - Minimize load imbalance: minimize(load_variance) subject to |Bᵢ| ≤ β
+   - Apply size constraints: ensure serialized_size(Bᵢ) ≤ max_message_size
+   - Optimize for parallel processing: balance_processing_time(B₁, B₂, ..., Bₖ)
 
-4. MESSAGE_SERIALIZATION:
-   - Serialize sequence batch to JSON format
-   - Include metadata for batch processing
-   - Ensure message size stays within SQS limits
-   - Add correlation identifiers for tracking
+4. MESSAGE_COMPOSITION:
+   For each batch Bᵢ:
+   - Create message payload: payload(Bᵢ) = serialize(Bᵢ) + metadata(Bᵢ)
+   - Validate size constraint: |payload(Bᵢ)| ≤ max_message_size
+   - Add batch identifiers: batch_id = (i, k, correlation_id)
+   - Include processing metadata: metadata = {batch_number, total_batches, sequence_order}
 
-5. DISTRIBUTED_PROCESSING:
-   - Each batch processed independently
-   - Parallel processing across multiple Lambda instances
-   - Maintain processing order where required
-   - Aggregate results from all batches
+5. DISTRIBUTED_TRANSMISSION:
+   - Transmit batches in parallel: parallel_send(payload(B₁), payload(B₂), ..., payload(Bₖ))
+   - Maintain batch ordering: preserve_order = {order(B₁) < order(B₂) < ... < order(Bₖ)}
+   - Enable fault tolerance: retry_policy(Bᵢ) for failed transmissions
+   - Track completion status: completion_vector = [status(B₁), status(B₂), ..., status(Bₖ)]
 
 OUTPUT: 
-- Sequence batches ready for distributed processing
-- SQS messages containing serialized batch data
-- Parallel processing capability for large sequence sets
+- Batch partition set B = {B₁, B₂, ..., Bₖ} where ∪Bᵢ = S
+- Message payload collection P = {payload(B₁), payload(B₂), ..., payload(Bₖ)}
+- Parallel processing distribution across k independent processing units
 ```
 
 ### Code Location and Usage
