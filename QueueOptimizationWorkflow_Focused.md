@@ -7,17 +7,28 @@
 **How**: Extracts and validates message attributes including ServiceProviderId, BillPeriodId, and TenantId.
 
 ### Algorithm
-```mathematical
-For queue message reception R with SQS event S:
-Let required_attributes = {ServiceProviderId, BillPeriodId, TenantId}
-
-For each message m ∈ S.Records:
-    If m.MessageAttributes.ContainsKey(attr) ∀ attr ∈ required_attributes:
-        Extract message_data = Parse(m.MessageAttributes)
-        Return valid_message_data
-    Else:
-        Log("EXCEPTION", "Missing required attributes")
-        Return invalid_message
+```
+STEP 1: Receive SQS Event
+    IF sqsEvent has Records
+        Get first message from Records
+        
+STEP 2: Check Message Attributes
+    IF message contains "OptimizationSessionId" AND "HasSynced"
+        Set isAutoCarrierOptimization = true
+        
+STEP 3: Validate Required Fields
+    CHECK if message has "ServiceProviderId"
+        IF missing: Log error and exit
+    CHECK if message has "BillPeriodId" 
+        IF missing: Log error and exit
+    CHECK if message has "TenantId"
+        IF missing: Log error and exit
+        
+STEP 4: Extract Message Data
+    Parse ServiceProviderId from message
+    Parse BillPeriodId from message  
+    Parse TenantId from message
+    Continue to next step
 ```
 
 ### Code Location
@@ -62,20 +73,32 @@ int tenantId = int.Parse(message.MessageAttributes["TenantId"].StringValue);
 **How**: Queries database for active optimization sessions and checks completion status.
 
 ### Algorithm
-```mathematical
-For queue status validation V with tenant T:
-Let active_sessions = Query(vwOptimizationSessionRunning, T.tenantId)
-
-If active_sessions ≠ ∅:
-    current_time = DateTime.UtcNow
-    billing_end = billingPeriod.BillingPeriodEnd
+```
+STEP 1: Query Active Optimizations
+    Search database for running optimization sessions
+    Use vwOptimizationSessionRunning view
+    Filter by TenantId from message
     
-    If current_time.Date = billing_end.Date ∧ last_status = Completed:
-        Return allow_new_optimization
-    Else:
-        Return optimization_already_running
-Else:
-    Return ready_for_optimization
+STEP 2: Check If Optimization Running
+    IF no active sessions found
+        Return "ready for optimization"
+        Continue to next step
+        
+STEP 3: Handle Active Sessions
+    IF optimization is currently running
+        Get current time and billing period end date
+        
+        IF today is last day of billing period AND last optimization completed
+            Allow new optimization run
+        ELSE
+            Log warning message
+            Send alert email to administrators
+            Stop processing and exit
+            
+STEP 4: Start New Session
+    IF optimization allowed
+        Create new optimization session
+        Generate session ID for tracking
 ```
 
 ### Code Location
@@ -137,18 +160,35 @@ else
 **How**: Starts optimization session and instance, then retrieves carrier configuration data.
 
 ### Algorithm
-```mathematical
-For instance data loading I with session S:
-Let optimization_session = StartOptimizationSession(S.tenantId, S.billingPeriod)
-Let instance = StartOptimizationInstance(S.serviceProviderId, optimization_session)
-
-Load configuration_data = {
-    comm_plans = GetCommPlans(S.serviceProviderId),
-    rate_plans = GetRatePlans(S.serviceProviderId),
-    billing_period = GetBillingPeriod(S.billingPeriodId)
-}
-
-Return instance_context = {instance, configuration_data}
+```
+STEP 1: Get Billing Period Data
+    Retrieve billing period using BillPeriodId
+    Get billing start and end dates
+    Get billing timezone information
+    
+STEP 2: Create Optimization Instance
+    Get integration authentication ID for service provider
+    Create new optimization instance with:
+        - TenantId, ServiceProviderId
+        - Billing period start/end dates
+        - Portal type (M2M or Mobility)
+        - Optimization session ID
+        
+STEP 3: Load Configuration Data
+    Get communication plans for service provider
+    Get rate plans for service provider
+    Get device settings (proration options)
+    Get integration type (Jasper, Rogers, etc.)
+    
+STEP 4: Validate Data
+    CHECK if communication plans exist
+    CHECK if rate plans exist
+    IF either missing: Log error and stop
+    
+STEP 5: Calculate Expected Device Count
+    Query expected SIM card count for optimization
+    Use service provider and billing period
+    Store count for validation later
 ```
 
 ### Code Location
@@ -192,19 +232,40 @@ private async Task RunOptimization(KeySysLambdaContext context, int tenantId, in
 **How**: Groups communication plans, creates optimization queues, and generates rate plan sequences.
 
 ### Algorithm
-```mathematical
-For queue processing Q with comm_plans C and rate_plans R:
-For each group g ∈ C.GroupBy(x => x.RatePlanIds):
-    comm_plan_group_id = CreateCommPlanGroup(instance.Id)
-    group_rate_plans = RatePlansForGroup(R, g)
+```
+STEP 1: Group Communication Plans
+    Take all communication plans for service provider
+    Group them by RatePlanIds (plans that share same rate plans)
+    Filter out plans with empty RatePlanIds
     
-    If |group_rate_plans| > 15:
-        SendCarrierPlanLimitAlertEmail()
-    Else If |group_rate_plans| > 1:
-        rate_pool_sequences = GenerateRatePoolSequences(group_rate_plans)
-        For each sequence s ∈ rate_pool_sequences:
-            queue_id = CreateQueue(instance.Id, comm_plan_group_id)
-            AddRatePlansToQueue(queue_id, s)
+STEP 2: Process Each Communication Plan Group
+    FOR each group of communication plans:
+        Create new communication plan group in database
+        Add all communication plans to this group
+        
+STEP 3: Get Rate Plans for Group
+    Find all rate plans that match this group
+    Filter rate plans based on group's RatePlanIds
+    
+STEP 4: Validate Rate Plan Count
+    COUNT rate plans in group
+    IF count > 15:
+        Send alert email to administrators
+        Log error about rate plan limit exceeded
+        Skip this group
+        
+STEP 5: Create Optimization Queues
+    IF rate plan count between 2 and 15:
+        Generate all possible rate plan sequences
+        FOR each rate plan sequence:
+            Create new optimization queue
+            Add rate plans to queue in sequence order
+            Store queue for parallel processing
+            
+STEP 6: Bulk Create All Queues
+    Create DataTable with queue information
+    Use SQL bulk copy for performance
+    Get generated queue IDs back from database
 ```
 
 ### Code Location
@@ -263,16 +324,40 @@ public List<long> BulkCreateQueue(KeySysLambdaContext context, long instanceId, 
 **How**: Calculates rate pools, assigns devices, and sends optimization queues for parallel execution.
 
 ### Algorithm
-```mathematical
-For optimization execution E with rate_plans R and devices D:
-Let calculated_plans = RatePoolCalculator.CalculateMaxAvgUsage(R)
-Let rate_pools = CreateRatePools(calculated_plans, billing_period)
-Let rate_pool_collection = CreateRatePoolCollection(rate_pools)
-
-device_assignment = BaseDeviceAssignment(D, rate_pool_collection)
-rate_pool_sequences = GenerateRatePoolSequences(rate_pool_collection.RatePools)
-
-Send optimization_queues to parallel_processors
+```
+STEP 1: Calculate Rate Plan Usage
+    FOR each rate plan in group:
+        Calculate maximum average usage
+        Determine data allowances and overage rates
+        Validate overage charges are greater than 0
+        
+STEP 2: Create Rate Pools
+    Convert calculated plans to rate pools
+    Apply billing period settings
+    Include proration if enabled
+    Set charge type to RateChargeAndOverage
+    
+STEP 3: Create Rate Pool Collection
+    Combine all rate pools into collection
+    Organize for optimization processing
+    
+STEP 4: Assign Devices to Base Plans
+    Get all SIM cards for communication plan names
+    Assign each device to best initial rate plan
+    Calculate initial cost baseline
+    COUNT devices assigned (must be > 1 for optimization)
+    
+STEP 5: Generate Rate Plan Sequences
+    IF device count > 1:
+        Create all possible rate plan combinations
+        Generate sequences for parallel testing
+        Each sequence represents different plan assignment
+        
+STEP 6: Send to Parallel Processing
+    Break sequences into batches
+    Create SQS messages with rate plan sequences
+    Send to optimization queue for worker processing
+    Include communication group ID for tracking
 ```
 
 ### Code Location
@@ -319,16 +404,38 @@ private async Task SendMessageToCreateQueueRatePlans(KeySysLambdaContext context
 **How**: Bulk inserts queue data and rate plan sequences using SQL bulk copy operations.
 
 ### Algorithm
-```mathematical
-For result saving S with queues Q and sequences R:
-Let queue_rate_plan_table = DataTable()
-
-For each sequence s ∈ R:
-    queue_data = AddRatePlansToQueue(s.QueueId, s, rate_plan_table)
-    queue_rate_plan_table.AddRows(queue_data)
-
-BulkInsert(queue_rate_plan_table, "OptimizationQueue_RatePlan")
-SendRunOptimizerMessage(R, batch_size)
+```
+STEP 1: Receive Rate Plan Sequences
+    Deserialize rate plan sequences from SQS message
+    Extract communication group ID from message
+    Validate both sequences and group ID exist
+    
+STEP 2: Prepare Data Tables
+    Create DataTable for queue-rate plan mappings
+    Add columns: QueueId, CommGroupRatePlanId, SequenceOrder, CreatedBy, CreatedDate
+    
+STEP 3: Load Existing Rate Plan Data
+    Query database for communication group rate plans
+    Get mapping of rate plan IDs to database IDs
+    Load into DataTable for reference
+    
+STEP 4: Process Each Sequence
+    FOR each rate plan sequence:
+        Get rate plans for this queue
+        Add queue-rate plan mappings to data table
+        Set sequence order for each rate plan
+        Add creation metadata (created by, date)
+        
+STEP 5: Bulk Save to Database
+    Use SQL bulk copy to insert queue-rate plan data
+    Insert into OptimizationQueue_RatePlan table
+    Batch insert for performance
+    
+STEP 6: Trigger Optimizer Workers
+    Send message to run optimizer workers
+    Include sequence data and batch size
+    Workers will process queues in parallel
+    Each worker handles subset of optimization queues
 ```
 
 ### Code Location
