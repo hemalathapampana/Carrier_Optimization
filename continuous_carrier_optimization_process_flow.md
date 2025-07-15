@@ -287,8 +287,8 @@ OptimizationAmopApiTrigger.SendResponseToAMOP20(
 - 30%: Communication grouping complete
 - 40%: Rate pool generation complete
 - 50%: Optimization processing initiated
-- 90%: Cleanup completed
-- 100%: Process complete
+- **NO 90%**: Cleanup does NOT send trigger (Missing)
+- **NO 100%**: Process completion NOT tracked (Missing)
 
 #### 2. Error Triggers
 **Purpose**: Immediate notification of process failures

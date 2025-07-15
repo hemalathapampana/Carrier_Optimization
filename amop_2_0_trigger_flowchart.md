@@ -243,29 +243,29 @@ This flowchart shows the detailed process of how triggers are sent from the Carr
     └─────────┬───────────────┘
               │
               ▼
-         ┌────────────────────────────────────────────────────────────┐
-         │                TRIGGER POINT #6                            │
-         │                 Process Complete                           │
-         └────────────────────────────────────────────────────────────┘
+    ┌─────────────────────────┐
+    │   Cleanup Lambda        │
+    │                         │
+    │ • Mark instances        │
+    │   CompleteWithSuccess   │
+    │ • Generate reports      │
+    │ • Queue email sends     │
+    └─────────┬───────────────┘
               │
               ▼
-    ┌─────────────────────────────────────────────────────────────────────┐
-    │  OptimizationAmopApiTrigger.SendResponseToAMOP20(                  │
-    │      context: ILambdaContext,                                      │
-    │      messageType: "Progress",                                      │
-    │      sessionId: optimizationSessionId.ToString(),                  │
-    │      sessionGuid: optimizationSessionGuid,                         │
-    │      deviceCount: totalDevicesProcessed,                           │
-    │      errorMessage: null,                                           │
-    │      progressPercentage: 100,                                      │
-    │      additionalInfo: "Optimization Complete",                      │
-    │      additionalData: optimizationResults                           │
-    │  );                                                                │
-    └─────────────────────────┬───────────────────────────────────────────┘
+         ┌────────────────────────────────────────────────────────────┐
+         │              NO 100% TRIGGER FOUND                         │
+         │         Cleanup Lambda does NOT send AMOP 2.0              │
+         │         100% completion trigger in current code            │
+         └────────────────────────────────────────────────────────────┘
               │
               ▼
     ┌─────────────────────────┐
     │     End Process         │
+    │                         │
+    │ • Process ends at 50%   │
+    │ • No final AMOP trigger │
+    │ • Cleanup runs silently │
     └─────────────────────────┘
 ```
 
@@ -463,8 +463,8 @@ This flowchart shows the detailed process of how triggers are sent from the Carr
 | Comm Grouping     | 30%            | Once per group| Group validation |
 | Rate Pool Gen     | 40%            | Once per pool | Pool creation |
 | Optimization      | 50%            | Once per exec | Processing start |
-| Cleanup           | 90%            | Once per clean| Cleanup progress |
-| Completion        | 100%           | Once per run  | Final status |
+| **NO CLEANUP**    | **NO 90%**     | **NOT FOUND** | **Missing trigger** |
+| **NO COMPLETION** | **NO 100%**    | **NOT FOUND** | **Missing trigger** |
 | **Error Triggers**| 0%             | As needed     | Immediate alert |
 
 ---
